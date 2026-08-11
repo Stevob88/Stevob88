@@ -261,11 +261,6 @@
 
   .stage-tools{display:flex;gap:8px;margin-top:4px;}
   .stage-tools .add-btn{margin-top:0;flex:1;}
-  .del-stage{
-    width:44px;flex-shrink:0;border:1.5px dashed var(--danger);border-radius:11px;
-    background:transparent;color:var(--danger);display:flex;align-items:center;justify-content:center;cursor:pointer;
-  }
-  .del-stage svg{width:18px;height:18px;}
 
   .plot-del-row{display:flex;justify-content:flex-end;margin-top:2px;}
   .del-plot{
@@ -822,18 +817,7 @@ function renderStage(stage){
     plot_new(stage);
     save(); render();
   };
-  const delStage = document.createElement("button");
-  delStage.className = "del-stage";
-  delStage.innerHTML = ICON.trash;
-  delStage.setAttribute("aria-label","Delete stage");
-  delStage.onclick = () => {
-    if(confirm('Delete stage "'+stage.name+'" and all its plots?')){
-      state = state.filter(s => s.id !== stage.id);
-      save(); render();
-    }
-  };
   tools.appendChild(addPlot);
-  tools.appendChild(delStage);
   body.appendChild(tools);
 
   el.appendChild(body);
