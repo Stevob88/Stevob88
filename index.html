@@ -129,9 +129,21 @@
     overflow:hidden;
   }
   .plot:last-child{margin-bottom:0;}
+  .plot-swipe{position:relative;overflow:hidden;}
+  .plot-swipe-action{
+    position:absolute;top:0;right:0;bottom:0;left:0;
+    display:flex;align-items:center;justify-content:flex-end;gap:8px;
+    padding:0 18px;
+    background:linear-gradient(90deg,var(--green-light),var(--green));
+    color:#fff;font-weight:700;font-size:14px;white-space:nowrap;
+  }
+  .plot-swipe-action .lbl{overflow:hidden;text-overflow:ellipsis;max-width:60%;}
+  .plot-swipe-action svg{width:20px;height:20px;flex-shrink:0;}
   .plot-head{
+    position:relative;background:#FCFEFD;
     display:flex;align-items:center;gap:8px;
     padding:11px 12px;cursor:pointer;
+    touch-action:pan-y;will-change:transform;
   }
   .plot-head .chev{width:18px;height:18px;}
   .plot-name{
@@ -284,6 +296,7 @@ const ICON = {
   note:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"/><path d="M4 10h16"/><path d="M4 15h9"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/><path d="M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13"/></svg>',
   plus:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>',
+  arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>',
 };
 
 /* ============================================================
@@ -493,6 +506,23 @@ function renderPlot(stage, plot){
   el.className = "plot" + (plot.open ? " open" : "");
   const { done, total } = plotCounts(plot);
 
+  const si = state.indexOf(stage);
+  const nextStage = (si >= 0 && si < state.length - 1) ? state[si + 1] : null;
+
+  const swipe = document.createElement("div");
+  swipe.className = "plot-swipe";
+
+  if(nextStage){
+    const action = document.createElement("div");
+    action.className = "plot-swipe-action";
+    const lbl = document.createElement("span");
+    lbl.className = "lbl";
+    lbl.textContent = nextStage.name;
+    action.appendChild(lbl);
+    action.insertAdjacentHTML("beforeend", ICON.arrow);
+    swipe.appendChild(action);
+  }
+
   const head = document.createElement("div");
   head.className = "plot-head";
   head.innerHTML = ICON.chev;
@@ -510,8 +540,14 @@ function renderPlot(stage, plot){
 
   head.appendChild(nameInput);
   head.appendChild(frac);
-  head.onclick = () => { plot.open = !plot.open; save(); el.classList.toggle("open", plot.open); };
-  el.appendChild(head);
+  head.onclick = () => {
+    if(head.__swiped) return;              /* was a horizontal swipe — ignore the tap */
+    plot.open = !plot.open; save(); el.classList.toggle("open", plot.open);
+  };
+  swipe.appendChild(head);
+  el.appendChild(swipe);
+
+  if(nextStage) attachSwipe(head, stage, plot);
 
   const body = document.createElement("div");
   body.className = "plot-body";
@@ -542,6 +578,75 @@ function renderPlot(stage, plot){
 
   el.appendChild(body);
   return el;
+}
+
+/* Swipe a plot row left to advance it to the next stage */
+function attachSwipe(head, stage, plot){
+  const MAX = 150, TRIG = 72;
+  let startX = 0, startY = 0, dx = 0, dragging = false, decided = false, horiz = false;
+
+  const settle = () => {
+    head.style.transition = "transform .2s ease";
+    head.style.transform = "translateX(0)";
+  };
+
+  head.addEventListener("pointerdown", e => {
+    if(e.pointerType === "mouse" && e.button !== 0) return;
+    startX = e.clientX; startY = e.clientY;
+    dx = 0; dragging = true; decided = false; horiz = false;
+    head.style.transition = "none";
+  });
+
+  head.addEventListener("pointermove", e => {
+    if(!dragging) return;
+    const mx = e.clientX - startX, my = e.clientY - startY;
+    if(!decided && (Math.abs(mx) > 8 || Math.abs(my) > 8)){
+      decided = true;
+      horiz = Math.abs(mx) > Math.abs(my);
+      if(horiz){ try{ head.setPointerCapture(e.pointerId); }catch(_){ } }
+    }
+    if(decided && horiz){
+      dx = Math.max(-MAX, Math.min(0, mx));   /* left only */
+      head.style.transform = "translateX(" + dx + "px)";
+      if(Math.abs(dx) > 6) head.__swiped = true;
+    }
+  });
+
+  const end = () => {
+    if(!dragging) return;
+    dragging = false;
+    const trigger = decided && horiz && dx <= -TRIG;
+    settle();
+    if(trigger) setTimeout(() => movePlotToNextStage(stage, plot), 80);
+    setTimeout(() => { head.__swiped = false; }, 60);
+  };
+  head.addEventListener("pointerup", end);
+  head.addEventListener("pointercancel", end);
+}
+
+function movePlotToNextStage(stage, plot){
+  const si = state.indexOf(stage);
+  if(si < 0 || si >= state.length - 1){ showToast('"' + plot.name + '" is at the final stage'); return; }
+  const next = state[si + 1];
+  const c = plotCounts(plot);
+  if(!confirm('Move "' + plot.name + '" (' + c.done + '/' + c.total + ' done) to "' + next.name + '"?')) return;
+
+  /* remove from current stage */
+  stage.plots = stage.plots.filter(p => p.id !== plot.id);
+
+  /* merge on matching name so we never create a duplicate plot in the next stage */
+  const existing = next.plots.find(p => p.name.trim().toLowerCase() === plot.name.trim().toLowerCase());
+  if(!existing){
+    /* new to this stage — give it this stage's checklist (cloned from a sibling plot, fresh/unticked) */
+    const sibling = next.plots[0];
+    const template = sibling ? sibling.tasks : plot.tasks;
+    const tasks = template.map(t => ({ id: uid(), name: t.name, done: false, note: "", noteOpen: false }));
+    next.plots.push({ id: uid(), name: plot.name, open: false, tasks });
+  }
+
+  next.open = true;          /* reveal the destination so the move is visible */
+  save(); render();
+  showToast('"' + plot.name + '" moved to ' + next.name);
 }
 
 function renderTask(stage, plot, task){
