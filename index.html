@@ -303,18 +303,23 @@ const ICON = {
    Default seed data
    ============================================================ */
 /* Each stage carries a "preset" — the trade tasks auto-added to any plot that is
-   created in, or moved into, that stage. Stages 6-9 presets are pending photos. */
+   created in, or moved into, that stage. */
 const SEED = [
-  ["Foundations",    ["Groundworker","Steel","NHBC Foundations","Concrete"]],
-  ["Substructure",   ["Blockwork","drainage","NHBC Drainage","Block and Beam","Insulation","Pour Slab","Soleplate","Splash","Scaff Matt"]],
-  ["Superstructure", ["Scaffold","Crane","Timberframe","Oregon Externals","Brickwork","NHBC Superstructure"]],
-  ["Roof",           ["Felt & Batten","Pv Panel","Roof tile"]],
-  ["1st Fix",        ["Joiner Prefix","Electrician Prefix","Plumber Prefix","VCL","Joiner 1st Fix","Plumber 1st Fix","Electrician 1st Fix","Party Wall","Windows","Joiner Dropbacks","Barratt","NHBC Preplaster"]],
-  ["Plasterboard",   []],
-  ["2nd Fix",        []],
-  ["Paint",          []],
-  ["Finals",         []],
+  ["Foundations",        ["Groundworker","Steel","NHBC Foundations","Concrete"]],
+  ["Substructure",       ["Blockwork","drainage","NHBC Drainage","Block and Beam","Insulation","Pour Slab","Soleplate","Splash","Scaff Matt"]],
+  ["Superstructure",     ["Scaffold","Crane","Timberframe","Oregon Externals","Brickwork","NHBC Superstructure"]],
+  ["Roof",               ["Felt & Batten","Pv Panel","Roof tile"]],
+  ["1st Fix",            ["Joiner Prefix","Electrician Prefix","Plumber Prefix","VCL","Joiner 1st Fix","Plumber 1st Fix","Electrician 1st Fix","Party Wall","Windows","Joiner Dropbacks","Barratt","NHBC Preplaster"]],
+  ["Plasterboard",       ["Boarder","Taper","MF Ceiling"]],
+  ["2nd Fix",            ["Mistcoat","Joiner 2nd fix","Plumber 2nd fix","Electrician 2nd fix","wall tiler","Kitchen","Patcher"]],
+  ["Paint & Decoration", ["Painter"]],
+  ["Finals",             ["Build clean","Mastic","Joiner Final","Electrician Final","PV Commission","Plumber final","Flooring","Patcher final","Paint final","Appliances","Reclean","All Trade Snags","CML"]],
 ];
+
+/* Presets keyed by stage name, plus renames of earlier default names.
+   Used to non-destructively backfill presets onto existing saved data. */
+const PRESETS = Object.fromEntries(SEED.map(([n, t]) => [n, t]));
+const STAGE_RENAMES = { "Paint": "Paint & Decoration" };
 
 const STORE_KEY = "siteProgress.v2";
 let uidCounter = 0;
@@ -353,10 +358,30 @@ function load(){
     const raw = localStorage.getItem(STORE_KEY);
     if(raw){
       const parsed = JSON.parse(raw);
-      if(Array.isArray(parsed) && parsed.length >= 0) return normalize(parsed);
+      if(Array.isArray(parsed) && parsed.length >= 0) return migrate(normalize(parsed));
     }
   }catch(e){ console.warn("load failed", e); }
   return buildSeed();
+}
+
+/* Non-destructively bring saved data up to date with the latest preset library:
+   apply known stage renames and backfill presets (and empty plots) for any stage
+   that still has no preset. Existing names, ticks and populated plots are untouched. */
+function migrate(stages){
+  stages.forEach(s => {
+    if(STAGE_RENAMES[s.name] && (!s.preset || !s.preset.length)) s.name = STAGE_RENAMES[s.name];
+  });
+  stages.forEach(s => {
+    if((!s.preset || !s.preset.length) && PRESETS[s.name]){
+      s.preset = PRESETS[s.name].slice();
+      s.plots.forEach(p => {
+        if(!p.tasks || !p.tasks.length){
+          p.tasks = s.preset.map(n => ({ id: uid(), name: n, done: false, note: "", noteOpen: false }));
+        }
+      });
+    }
+  });
+  return stages;
 }
 
 /* Make sure every node has the fields we expect (defensive against old saves) */
