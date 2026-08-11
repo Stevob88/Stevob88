@@ -302,34 +302,45 @@ const ICON = {
 /* ============================================================
    Default seed data
    ============================================================ */
+/* Each stage carries a "preset" — the trade tasks auto-added to any plot that is
+   created in, or moved into, that stage. Stages 6-9 presets are pending photos. */
 const SEED = [
-  ["Start Foundations", ["Excavation","Blinding","Steel / rebar","Concrete pour"]],
-  ["Start Supers",      ["Block & beam","Brickwork ground floor","Scaffold lift 1"]],
-  ["Finish Supers",     ["Brickwork first floor","Gable ends","Scaffold full height"]],
-  ["Roof",              ["Trusses","Felt & batten","Tiling","Fascia / soffit"]],
-  ["First Fix",         ["Joiner first fix","Plumber first fix","Electrician first fix"]],
-  ["Boarding & Taping", ["Insulation","Plasterboard","Taping & jointing"]],
-  ["Finish Second Fix", ["Joiner second fix","Plumber second fix","Electrician second fix"]],
-  ["Finish Paint",      ["Mist coat","Undercoat","Top coat","Snagging"]],
-  ["CML",               ["NHBC inspection","Clean","Handover pack","Completion cert"]],
+  ["Foundations",    ["Groundworker","Steel","NHBC Foundations","Concrete"]],
+  ["Substructure",   ["Blockwork","drainage","NHBC Drainage","Block and Beam","Insulation","Pour Slab","Soleplate","Splash","Scaff Matt"]],
+  ["Superstructure", ["Scaffold","Crane","Timberframe","Oregon Externals","Brickwork","NHBC Superstructure"]],
+  ["Roof",           ["Felt & Batten","Pv Panel","Roof tile"]],
+  ["1st Fix",        ["Joiner Prefix","Electrician Prefix","Plumber Prefix","VCL","Joiner 1st Fix","Plumber 1st Fix","Electrician 1st Fix","Party Wall","Windows","Joiner Dropbacks","Barratt","NHBC Preplaster"]],
+  ["Plasterboard",   []],
+  ["2nd Fix",        []],
+  ["Paint",          []],
+  ["Finals",         []],
 ];
 
-const STORE_KEY = "siteProgress.v1";
+const STORE_KEY = "siteProgress.v2";
 let uidCounter = 0;
 const uid = () => "id" + (Date.now().toString(36)) + (uidCounter++).toString(36) + Math.floor(performance.now()).toString(36);
 
 function buildSeed(){
-  return SEED.map(([name, tasks]) => ({
+  return SEED.map(([name, preset]) => ({
     id: uid(),
     name,
     open: false,
+    preset: preset.slice(),
     plots: [1,2].map(n => ({
       id: uid(),
       name: "Plot " + n,
       open: false,
-      tasks: tasks.map(t => ({ id: uid(), name: t, done: false, note: "", noteOpen: false }))
+      tasks: preset.map(t => ({ id: uid(), name: t, done: false, note: "", noteOpen: false }))
     }))
   }));
+}
+
+/* Build a fresh task list for a plot from a stage's preset.
+   Falls back to a sibling plot's task names if the stage has no preset yet. */
+function tasksFromStage(stage){
+  let names = (stage.preset && stage.preset.length) ? stage.preset.slice() : [];
+  if(!names.length && stage.plots[0]) names = stage.plots[0].tasks.map(t => t.name);
+  return names.map(n => ({ id: uid(), name: n, done: false, note: "", noteOpen: false }));
 }
 
 /* ============================================================
@@ -354,6 +365,7 @@ function normalize(stages){
     id: s.id || uid(),
     name: s.name || "Stage",
     open: !!s.open,
+    preset: Array.isArray(s.preset) ? s.preset.slice() : [],
     plots: (s.plots || []).map(p => ({
       id: p.id || uid(),
       name: p.name || "Plot",
@@ -498,7 +510,7 @@ function renderStage(stage){
 
 function plot_new(stage){
   const n = stage.plots.length + 1;
-  stage.plots.push({ id: uid(), name: "Plot " + n, open: true, tasks: [] });
+  stage.plots.push({ id: uid(), name: "Plot " + n, open: true, tasks: tasksFromStage(stage) });
 }
 
 function renderPlot(stage, plot){
@@ -637,11 +649,8 @@ function movePlotToNextStage(stage, plot){
   /* merge on matching name so we never create a duplicate plot in the next stage */
   const existing = next.plots.find(p => p.name.trim().toLowerCase() === plot.name.trim().toLowerCase());
   if(!existing){
-    /* new to this stage — give it this stage's checklist (cloned from a sibling plot, fresh/unticked) */
-    const sibling = next.plots[0];
-    const template = sibling ? sibling.tasks : plot.tasks;
-    const tasks = template.map(t => ({ id: uid(), name: t.name, done: false, note: "", noteOpen: false }));
-    next.plots.push({ id: uid(), name: plot.name, open: false, tasks });
+    /* new to this stage — give it this stage's preset checklist (fresh/unticked) */
+    next.plots.push({ id: uid(), name: plot.name, open: false, tasks: tasksFromStage(next) });
   }
 
   next.open = true;          /* reveal the destination so the move is visible */
