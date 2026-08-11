@@ -405,6 +405,7 @@ function tasksFromStage(stage){
    ============================================================ */
 const TIMELINE_KEY = "siteProgress.timeline.v1";   /* { plotName: [ {stage, task, at} ] } */
 const COMPLETED_KEY = "siteProgress.completed.v1"; /* [ { name, at, plot } ] */
+const RESTORE_FLAG = "siteProgress.restoredMissing.v1";
 
 let state = load();
 let timeline = loadJSON(TIMELINE_KEY, {});
@@ -422,10 +423,42 @@ function load(){
     const raw = localStorage.getItem(STORE_KEY);
     if(raw){
       const parsed = JSON.parse(raw);
-      if(Array.isArray(parsed) && parsed.length >= 0) return migrate(normalize(parsed));
+      if(Array.isArray(parsed) && parsed.length >= 0) return restoreMissingStages(migrate(normalize(parsed)));
     }
   }catch(e){ console.warn("load failed", e); }
+  try{ localStorage.setItem(RESTORE_FLAG, "1"); }catch(e){}   /* fresh install already has every stage */
   return buildSeed();
+}
+
+/* One-time repair: re-insert any DEFAULT stage that has gone missing (e.g. deleted by
+   accident), at its correct position, with its preset and sample plots. Runs once only,
+   so intentionally deleted stages don't keep coming back. */
+function restoreMissingStages(stages){
+  try{ if(localStorage.getItem(RESTORE_FLAG)) return stages; }catch(e){}
+  const key = s => (s || "").trim().toLowerCase();
+  let changed = false;
+  SEED.forEach(([name, preset], i) => {
+    if(stages.some(s => key(s.name) === key(name))) return;
+    const fresh = {
+      id: uid(), name, open: false, preset: preset.slice(),
+      plots: [1, 2].map(n => ({
+        id: uid(), name: "Plot " + n, open: false,
+        tasks: preset.map(t => ({ id: uid(), name: t, done: false, doneAt: null, note: "", noteOpen: false }))
+      }))
+    };
+    let insertAt = 0;
+    for(let j = i - 1; j >= 0; j--){
+      const idx = stages.findIndex(s => key(s.name) === key(SEED[j][0]));
+      if(idx >= 0){ insertAt = idx + 1; break; }
+    }
+    stages.splice(insertAt, 0, fresh);
+    changed = true;
+  });
+  try{
+    if(changed) localStorage.setItem(STORE_KEY, JSON.stringify(stages));
+    localStorage.setItem(RESTORE_FLAG, "1");
+  }catch(e){}
+  return stages;
 }
 
 /* Non-destructively bring saved data up to date with the latest preset library:
