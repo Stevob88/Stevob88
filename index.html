@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Site Progress</title>
+
+<!-- PWA / iOS home-screen -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Site Progress" />
+<meta name="theme-color" content="#EAF7F3" />
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Crect width='180' height='180' rx='40' fill='%235EC6D8'/%3E%3Cpath d='M52 96l24 24 52-56' stroke='white' stroke-width='16' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+<!-- jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+  :root{
+    --bg:#EAF7F3;
+    --card:#FFFFFF;
+    --ink:#1E3A3A;
+    --ink-soft:#5B7373;
+    --line:#DCEDE8;
+    --blue:#5EC6D8;
+    --blue-dark:#3AA8BC;
+    --green:#33A87D;
+    --green-light:#3FB88C;
+    --green-soft:#E4F5EE;
+    --blue-soft:#E2F5F9;
+    --amber:#E8A83A;
+    --danger:#E77B7B;
+    --shadow:0 2px 10px rgba(30,58,58,.06);
+    --radius:16px;
+  }
+
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    font-size:16px;
+    line-height:1.4;
+    -webkit-text-size-adjust:100%;
+    overscroll-behavior-y:none;
+  }
+  h1,h2,h3{font-family:'Archivo',sans-serif;margin:0;}
+
+  /* ---------- Sticky top header ---------- */
+  header{
+    position:sticky;top:0;z-index:50;
+    background:var(--bg);
+    padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;
+    border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+  .brand .mark{
+    width:34px;height:34px;border-radius:10px;background:var(--blue);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .brand .mark svg{width:20px;height:20px;}
+  .brand h1{font-size:22px;font-weight:800;letter-spacing:-.3px;}
+  .overall-row{display:flex;align-items:center;gap:12px;}
+  .overall-bar-wrap{flex:1;}
+  .overall-meta{display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);margin-bottom:5px;font-weight:600;}
+  .overall-meta .pct{color:var(--green);font-weight:700;}
+  .bar{height:9px;border-radius:99px;background:var(--line);overflow:hidden;}
+  .bar > span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--blue),var(--green-light));transition:width .3s ease;}
+
+  /* ---------- Main scroll area ---------- */
+  main{padding:14px 14px 120px;}
+
+  /* ---------- Stage card ---------- */
+  .stage{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    margin-bottom:14px;
+    overflow:hidden;
+  }
+  .stage-head{
+    display:flex;align-items:center;gap:10px;
+    padding:14px;
+    cursor:pointer;
+  }
+  .chev{
+    width:22px;height:22px;flex-shrink:0;color:var(--ink-soft);
+    transition:transform .2s ease;
+  }
+  .open > .stage-head .chev, .open > .plot-head .chev{transform:rotate(90deg);}
+  .stage-title{flex:1;min-width:0;}
+  .stage-name{
+    font-family:'Archivo',sans-serif;font-weight:700;font-size:18px;
+    color:var(--ink);border:none;background:transparent;width:100%;
+    padding:2px 0;letter-spacing:-.2px;
+  }
+  .stage-name:focus{outline:none;background:var(--blue-soft);border-radius:6px;padding:2px 6px;}
+  .chip{
+    font-size:13px;font-weight:700;padding:4px 10px;border-radius:99px;
+    background:var(--blue-soft);color:var(--blue-dark);flex-shrink:0;white-space:nowrap;
+  }
+  .chip.done{background:var(--green-soft);color:var(--green);}
+  .stage-progress{padding:0 14px 12px;}
+  .stage-progress .bar{height:6px;}
+
+  /* ---------- Stage body ---------- */
+  .stage-body{display:none;padding:0 12px 12px;}
+  .open > .stage-body{display:block;}
+
+  /* ---------- Plot ---------- */
+  .plot{
+    border:1px solid var(--line);
+    border-radius:12px;
+    margin-bottom:10px;
+    background:#FCFEFD;
+    overflow:hidden;
+  }
+  .plot:last-child{margin-bottom:0;}
+  .plot-head{
+    display:flex;align-items:center;gap:8px;
+    padding:11px 12px;cursor:pointer;
+  }
+  .plot-head .chev{width:18px;height:18px;}
+  .plot-name{
+    flex:1;min-width:0;font-weight:700;font-size:15.5px;color:var(--ink);
+    border:none;background:transparent;padding:2px 0;
+  }
+  .plot-name:focus{outline:none;background:var(--blue-soft);border-radius:6px;padding:2px 6px;}
+  .frac{
+    font-size:12.5px;font-weight:700;padding:3px 9px;border-radius:99px;
+    background:var(--blue-soft);color:var(--blue-dark);flex-shrink:0;
+  }
+  .frac.done{background:var(--green-soft);color:var(--green);}
+  .plot-body{display:none;padding:2px 10px 10px;}
+  .plot.open > .plot-body{display:block;}
+
+  /* ---------- Task ---------- */
+  .task{
+    display:flex;align-items:flex-start;gap:10px;
+    padding:9px 4px;border-top:1px solid var(--line);
+  }
+  .task:first-child{border-top:none;}
+  .tick{
+    width:30px;height:30px;flex-shrink:0;border-radius:9px;
+    border:2px solid var(--line);background:#fff;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;margin-top:1px;transition:all .15s ease;
+  }
+  .tick svg{width:18px;height:18px;color:#fff;opacity:0;transform:scale(.5);transition:all .15s ease;}
+  .tick.on{background:var(--green);border-color:var(--green);}
+  .tick.on svg{opacity:1;transform:scale(1);}
+  .task-main{flex:1;min-width:0;}
+  .task-name{
+    width:100%;border:none;background:transparent;font-size:15.5px;color:var(--ink);
+    padding:5px 0;line-height:1.35;
+  }
+  .task-name:focus{outline:none;background:var(--blue-soft);border-radius:6px;padding:5px 6px;}
+  .task.checked .task-name{color:var(--ink-soft);text-decoration:line-through;text-decoration-color:var(--green-light);}
+  .note-area{display:none;margin-top:6px;}
+  .note-area.show{display:block;}
+  .note-area textarea{
+    width:100%;border:1px solid var(--line);border-radius:9px;
+    padding:8px 10px;font-family:inherit;font-size:14px;color:var(--ink);
+    background:#fff;resize:vertical;min-height:44px;
+  }
+  .note-area textarea:focus{outline:none;border-color:var(--blue);}
+  .task-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0;align-items:center;}
+  .icon-btn{
+    width:34px;height:34px;flex-shrink:0;border-radius:9px;border:1px solid var(--line);
+    background:#fff;color:var(--ink-soft);display:flex;align-items:center;justify-content:center;
+    cursor:pointer;padding:0;
+  }
+  .icon-btn svg{width:17px;height:17px;}
+  .icon-btn.note-on{background:var(--amber);border-color:var(--amber);color:#fff;}
+  .icon-btn.del{color:var(--danger);}
+  .icon-btn.del svg{width:16px;height:16px;}
+
+  /* ---------- Add buttons ---------- */
+  .add-btn{
+    display:flex;align-items:center;justify-content:center;gap:6px;
+    width:100%;padding:10px;margin-top:8px;
+    border:1.5px dashed var(--blue);border-radius:11px;background:transparent;
+    color:var(--blue-dark);font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;
+  }
+  .add-btn svg{width:16px;height:16px;}
+  .add-task-btn{margin-top:6px;border-color:var(--line);color:var(--ink-soft);}
+
+  .stage-tools{display:flex;gap:8px;margin-top:4px;}
+  .stage-tools .add-btn{margin-top:0;flex:1;}
+  .del-stage{
+    width:44px;flex-shrink:0;border:1.5px dashed var(--danger);border-radius:11px;
+    background:transparent;color:var(--danger);display:flex;align-items:center;justify-content:center;cursor:pointer;
+  }
+  .del-stage svg{width:18px;height:18px;}
+
+  .plot-del-row{display:flex;justify-content:flex-end;margin-top:2px;}
+  .del-plot{
+    display:inline-flex;align-items:center;gap:5px;
+    border:none;background:transparent;color:var(--danger);
+    font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:6px 4px;
+  }
+  .del-plot svg{width:14px;height:14px;}
+
+  #add-stage-btn{margin-top:2px;border-style:solid;background:var(--card);box-shadow:var(--shadow);padding:14px;}
+
+  /* ---------- Sticky export ---------- */
+  .export-bar{
+    position:fixed;left:0;right:0;bottom:0;z-index:60;
+    padding:12px 16px calc(env(safe-area-inset-bottom) + 12px);
+    background:linear-gradient(180deg,rgba(234,247,243,0) 0%,var(--bg) 32%);
+    pointer-events:none;
+  }
+  #export-btn{
+    pointer-events:auto;
+    width:100%;padding:16px;border:none;border-radius:14px;
+    background:var(--blue);color:#fff;font-family:'Archivo',sans-serif;font-weight:700;font-size:17px;
+    display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;
+    box-shadow:0 6px 18px rgba(94,198,216,.4);letter-spacing:.2px;
+  }
+  #export-btn:active{background:var(--blue-dark);}
+  #export-btn svg{width:20px;height:20px;}
+
+  .toast{
+    position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 92px);transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;padding:11px 18px;border-radius:99px;font-size:14px;font-weight:600;
+    opacity:0;pointer-events:none;transition:all .3s ease;z-index:70;white-space:nowrap;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>
+    </div>
+    <h1>Site Progress</h1>
+  </div>
+  <div class="overall-row">
+    <div class="overall-bar-wrap">
+      <div class="overall-meta">
+        <span id="overall-label">0 of 0 tasks complete</span>
+        <span class="pct" id="overall-pct">0%</span>
+      </div>
+      <div class="bar"><span id="overall-fill" style="width:0%"></span></div>
+    </div>
+  </div>
+</header>
+
+<main id="app"></main>
+
+<div class="export-bar">
+  <button id="export-btn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>
+    Export as PDF
+  </button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   Icons (inline SVG strings)
+   ============================================================ */
+const ICON = {
+  chev:  '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>',
+  note:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"/><path d="M4 10h16"/><path d="M4 15h9"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/><path d="M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13"/></svg>',
+  plus:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>',
+};
+
+/* ============================================================
+   Default seed data
+   ============================================================ */
+const SEED = [
+  ["Start Foundations", ["Excavation","Blinding","Steel / rebar","Concrete pour"]],
+  ["Start Supers",      ["Block & beam","Brickwork ground floor","Scaffold lift 1"]],
+  ["Finish Supers",     ["Brickwork first floor","Gable ends","Scaffold full height"]],
+  ["Roof",              ["Trusses","Felt & batten","Tiling","Fascia / soffit"]],
+  ["First Fix",         ["Joiner first fix","Plumber first fix","Electrician first fix"]],
+  ["Boarding & Taping", ["Insulation","Plasterboard","Taping & jointing"]],
+  ["Finish Second Fix", ["Joiner second fix","Plumber second fix","Electrician second fix"]],
+  ["Finish Paint",      ["Mist coat","Undercoat","Top coat","Snagging"]],
+  ["CML",               ["NHBC inspection","Clean","Handover pack","Completion cert"]],
+];
+
+const STORE_KEY = "siteProgress.v1";
+let uidCounter = 0;
+const uid = () => "id" + (Date.now().toString(36)) + (uidCounter++).toString(36) + Math.floor(performance.now()).toString(36);
+
+function buildSeed(){
+  return SEED.map(([name, tasks]) => ({
+    id: uid(),
+    name,
+    open: false,
+    plots: [1,2].map(n => ({
+      id: uid(),
+      name: "Plot " + n,
+      open: false,
+      tasks: tasks.map(t => ({ id: uid(), name: t, done: false, note: "", noteOpen: false }))
+    }))
+  }));
+}
+
+/* ============================================================
+   State + persistence
+   ============================================================ */
+let state = load();
+
+function load(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(Array.isArray(parsed) && parsed.length >= 0) return normalize(parsed);
+    }
+  }catch(e){ console.warn("load failed", e); }
+  return buildSeed();
+}
+
+/* Make sure every node has the fields we expect (defensive against old saves) */
+function normalize(stages){
+  return stages.map(s => ({
+    id: s.id || uid(),
+    name: s.name || "Stage",
+    open: !!s.open,
+    plots: (s.plots || []).map(p => ({
+      id: p.id || uid(),
+      name: p.name || "Plot",
+      open: !!p.open,
+      tasks: (p.tasks || []).map(t => ({
+        id: t.id || uid(),
+        name: t.name || "",
+        done: !!t.done,
+        note: t.note || "",
+        noteOpen: !!t.noteOpen
+      }))
+    }))
+  }));
+}
+
+let saveTimer = null;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+    catch(e){ console.warn("save failed", e); }
+  }, 120);
+}
+
+/* ============================================================
+   Progress maths
+   ============================================================ */
+function stageCounts(stage){
+  let done = 0, total = 0;
+  stage.plots.forEach(p => p.tasks.forEach(t => { total++; if(t.done) done++; }));
+  return { done, total };
+}
+function plotCounts(plot){
+  let done = 0;
+  plot.tasks.forEach(t => { if(t.done) done++; });
+  return { done, total: plot.tasks.length };
+}
+function overallCounts(){
+  let done = 0, total = 0;
+  state.forEach(s => { const c = stageCounts(s); done += c.done; total += c.total; });
+  return { done, total };
+}
+const pct = (done, total) => total === 0 ? 0 : Math.round((done/total)*100);
+
+/* ============================================================
+   Render
+   ============================================================ */
+const app = document.getElementById("app");
+
+function render(){
+  app.innerHTML = "";
+  state.forEach(stage => app.appendChild(renderStage(stage)));
+
+  const addStage = document.createElement("button");
+  addStage.className = "add-btn";
+  addStage.id = "add-stage-btn";
+  addStage.innerHTML = ICON.plus + " Add stage";
+  addStage.onclick = () => {
+    state.push({ id: uid(), name: "New stage", open: true, plots: [] });
+    save(); render();
+  };
+  app.appendChild(addStage);
+
+  renderOverall();
+}
+
+function renderOverall(){
+  const { done, total } = overallCounts();
+  const p = pct(done, total);
+  document.getElementById("overall-label").textContent = done + " of " + total + " tasks complete";
+  document.getElementById("overall-pct").textContent = p + "%";
+  document.getElementById("overall-fill").style.width = p + "%";
+}
+
+function renderStage(stage){
+  const el = document.createElement("div");
+  el.className = "stage" + (stage.open ? " open" : "");
+  const { done, total } = stageCounts(stage);
+  const p = pct(done, total);
+
+  /* head */
+  const head = document.createElement("div");
+  head.className = "stage-head";
+  head.innerHTML = ICON.chev;
+
+  const title = document.createElement("div");
+  title.className = "stage-title";
+  const nameInput = document.createElement("input");
+  nameInput.className = "stage-name";
+  nameInput.value = stage.name;
+  nameInput.setAttribute("aria-label","Stage name");
+  nameInput.onclick = e => e.stopPropagation();
+  nameInput.oninput = () => { stage.name = nameInput.value; save(); };
+  title.appendChild(nameInput);
+
+  const chip = document.createElement("span");
+  chip.className = "chip" + (total>0 && done===total ? " done" : "");
+  chip.textContent = p + "%";
+
+  head.appendChild(title);
+  head.appendChild(chip);
+  head.onclick = () => { stage.open = !stage.open; save(); el.classList.toggle("open", stage.open); };
+  el.appendChild(head);
+
+  /* progress bar */
+  const prog = document.createElement("div");
+  prog.className = "stage-progress";
+  prog.innerHTML = '<div class="bar"><span style="width:'+p+'%"></span></div>';
+  el.appendChild(prog);
+
+  /* body */
+  const body = document.createElement("div");
+  body.className = "stage-body";
+  stage.plots.forEach(plot => body.appendChild(renderPlot(stage, plot)));
+
+  const tools = document.createElement("div");
+  tools.className = "stage-tools";
+  const addPlot = document.createElement("button");
+  addPlot.className = "add-btn";
+  addPlot.innerHTML = ICON.plus + " Add plot";
+  addPlot.onclick = () => {
+    plot_new(stage);
+    save(); render();
+  };
+  const delStage = document.createElement("button");
+  delStage.className = "del-stage";
+  delStage.innerHTML = ICON.trash;
+  delStage.setAttribute("aria-label","Delete stage");
+  delStage.onclick = () => {
+    if(confirm('Delete stage "'+stage.name+'" and all its plots?')){
+      state = state.filter(s => s.id !== stage.id);
+      save(); render();
+    }
+  };
+  tools.appendChild(addPlot);
+  tools.appendChild(delStage);
+  body.appendChild(tools);
+
+  el.appendChild(body);
+  return el;
+}
+
+function plot_new(stage){
+  const n = stage.plots.length + 1;
+  stage.plots.push({ id: uid(), name: "Plot " + n, open: true, tasks: [] });
+}
+
+function renderPlot(stage, plot){
+  const el = document.createElement("div");
+  el.className = "plot" + (plot.open ? " open" : "");
+  const { done, total } = plotCounts(plot);
+
+  const head = document.createElement("div");
+  head.className = "plot-head";
+  head.innerHTML = ICON.chev;
+
+  const nameInput = document.createElement("input");
+  nameInput.className = "plot-name";
+  nameInput.value = plot.name;
+  nameInput.setAttribute("aria-label","Plot name");
+  nameInput.onclick = e => e.stopPropagation();
+  nameInput.oninput = () => { plot.name = nameInput.value; save(); };
+
+  const frac = document.createElement("span");
+  frac.className = "frac" + (total>0 && done===total ? " done" : "");
+  frac.textContent = done + "/" + total;
+
+  head.appendChild(nameInput);
+  head.appendChild(frac);
+  head.onclick = () => { plot.open = !plot.open; save(); el.classList.toggle("open", plot.open); };
+  el.appendChild(head);
+
+  const body = document.createElement("div");
+  body.className = "plot-body";
+  plot.tasks.forEach(task => body.appendChild(renderTask(stage, plot, task)));
+
+  const addTask = document.createElement("button");
+  addTask.className = "add-btn add-task-btn";
+  addTask.innerHTML = ICON.plus + " Add task";
+  addTask.onclick = () => {
+    plot.tasks.push({ id: uid(), name: "", done:false, note:"", noteOpen:true });
+    save(); render();
+  };
+  body.appendChild(addTask);
+
+  const delRow = document.createElement("div");
+  delRow.className = "plot-del-row";
+  const delPlot = document.createElement("button");
+  delPlot.className = "del-plot";
+  delPlot.innerHTML = ICON.trash + " Delete plot";
+  delPlot.onclick = () => {
+    if(confirm('Delete "'+plot.name+'"?')){
+      stage.plots = stage.plots.filter(p => p.id !== plot.id);
+      save(); render();
+    }
+  };
+  delRow.appendChild(delPlot);
+  body.appendChild(delRow);
+
+  el.appendChild(body);
+  return el;
+}
+
+function renderTask(stage, plot, task){
+  const el = document.createElement("div");
+  el.className = "task" + (task.done ? " checked" : "");
+
+  /* tick */
+  const tick = document.createElement("div");
+  tick.className = "tick" + (task.done ? " on" : "");
+  tick.innerHTML = ICON.check;
+  tick.setAttribute("role","checkbox");
+  tick.setAttribute("aria-checked", task.done ? "true" : "false");
+  tick.onclick = () => {
+    task.done = !task.done;
+    save();
+    /* light-weight in-place update to avoid collapsing focus */
+    el.classList.toggle("checked", task.done);
+    tick.classList.toggle("on", task.done);
+    tick.setAttribute("aria-checked", task.done ? "true" : "false");
+    refreshCounts();
+  };
+
+  /* main */
+  const main = document.createElement("div");
+  main.className = "task-main";
+  const nameInput = document.createElement("input");
+  nameInput.className = "task-name";
+  nameInput.value = task.name;
+  nameInput.placeholder = "Task name";
+  nameInput.setAttribute("aria-label","Task name");
+  nameInput.oninput = () => { task.name = nameInput.value; save(); };
+  main.appendChild(nameInput);
+
+  const noteArea = document.createElement("div");
+  noteArea.className = "note-area" + (task.noteOpen ? " show" : "");
+  const ta = document.createElement("textarea");
+  ta.value = task.note;
+  ta.placeholder = "Add a note…";
+  ta.setAttribute("aria-label","Task note");
+  ta.oninput = () => { task.note = ta.value; save(); updateNoteBtn(); };
+  noteArea.appendChild(ta);
+  main.appendChild(noteArea);
+
+  /* actions */
+  const actions = document.createElement("div");
+  actions.className = "task-actions";
+
+  const noteBtn = document.createElement("button");
+  noteBtn.innerHTML = ICON.note;
+  noteBtn.setAttribute("aria-label","Toggle note");
+  function updateNoteBtn(){
+    const hasNote = task.note.trim().length > 0;
+    noteBtn.className = "icon-btn" + (hasNote ? " note-on" : "");
+  }
+  updateNoteBtn();
+  noteBtn.onclick = () => {
+    task.noteOpen = !task.noteOpen;
+    save();
+    noteArea.classList.toggle("show", task.noteOpen);
+    if(task.noteOpen) ta.focus();
+  };
+
+  const delBtn = document.createElement("button");
+  delBtn.className = "icon-btn del";
+  delBtn.innerHTML = ICON.trash;
+  delBtn.setAttribute("aria-label","Delete task");
+  delBtn.onclick = () => {
+    plot.tasks = plot.tasks.filter(t => t.id !== task.id);
+    save(); render();
+  };
+
+  actions.appendChild(noteBtn);
+  actions.appendChild(delBtn);
+
+  el.appendChild(tick);
+  el.appendChild(main);
+  el.appendChild(actions);
+  return el;
+}
+
+/* Refresh all numeric displays (chips, fractions, bars, overall) in place */
+function refreshCounts(){
+  const stageEls = app.querySelectorAll(".stage");
+  stageEls.forEach((sEl, si) => {
+    const stage = state[si];
+    if(!stage) return;
+    const sc = stageCounts(stage);
+    const sp = pct(sc.done, sc.total);
+    const chip = sEl.querySelector(".stage-head .chip");
+    if(chip){ chip.textContent = sp + "%"; chip.classList.toggle("done", sc.total>0 && sc.done===sc.total); }
+    const fill = sEl.querySelector(".stage-progress .bar > span");
+    if(fill) fill.style.width = sp + "%";
+    const plotEls = sEl.querySelectorAll(".stage-body > .plot");
+    plotEls.forEach((pEl, pi) => {
+      const plot = stage.plots[pi];
+      if(!plot) return;
+      const pc = plotCounts(plot);
+      const frac = pEl.querySelector(".plot-head .frac");
+      if(frac){ frac.textContent = pc.done + "/" + pc.total; frac.classList.toggle("done", pc.total>0 && pc.done===pc.total); }
+    });
+  });
+  renderOverall();
+}
+
+/* ============================================================
+   PDF export
+   ============================================================ */
+function exportPDF(){
+  const { jsPDF } = window.jspdf || {};
+  if(!jsPDF){ showToast("PDF library not loaded — check connection"); return; }
+
+  const doc = new jsPDF({ unit:"pt", format:"a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginX = 40;
+  const marginBottom = 46;
+  let y = 52;
+
+  const today = new Date();
+  const dateStr = today.toLocaleDateString(undefined, { year:"numeric", month:"long", day:"numeric" });
+  const fileDate = today.getFullYear() + "-" + String(today.getMonth()+1).padStart(2,"0") + "-" + String(today.getDate()).padStart(2,"0");
+  const { done, total } = overallCounts();
+  const overallP = pct(done, total);
+
+  function newPageIfNeeded(need){
+    if(y + need > pageH - marginBottom){ doc.addPage(); y = 52; }
+  }
+
+  /* Title */
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(20);
+  doc.setTextColor(30,58,58);
+  doc.text("Site Progress", marginX, y);
+  y += 22;
+
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(11);
+  doc.setTextColor(91,115,115);
+  doc.text(dateStr, marginX, y);
+  doc.text("Overall: " + overallP + "%  (" + done + "/" + total + " tasks)", pageW - marginX, y, { align:"right" });
+  y += 12;
+  doc.setDrawColor(220,237,232);
+  doc.setLineWidth(1);
+  doc.line(marginX, y, pageW - marginX, y);
+  y += 22;
+
+  state.forEach(stage => {
+    const sc = stageCounts(stage);
+    const sp = pct(sc.done, sc.total);
+
+    newPageIfNeeded(30);
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(14);
+    doc.setTextColor(58,168,188);
+    doc.text(stage.name || "Stage", marginX, y);
+    doc.setFont("helvetica","normal");
+    doc.setFontSize(10);
+    doc.setTextColor(91,115,115);
+    doc.text(sp + "%  (" + sc.done + "/" + sc.total + ")", pageW - marginX, y, { align:"right" });
+    y += 16;
+
+    if(stage.plots.length === 0){
+      doc.setFontSize(10);
+      doc.setTextColor(150,165,165);
+      doc.text("— no plots —", marginX + 12, y);
+      y += 16;
+    }
+
+    stage.plots.forEach(plot => {
+      const pc = plotCounts(plot);
+      newPageIfNeeded(22);
+      doc.setFont("helvetica","bold");
+      doc.setFontSize(11.5);
+      doc.setTextColor(30,58,58);
+      doc.text(plot.name || "Plot", marginX + 12, y);
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(120,140,140);
+      doc.text(pc.done + "/" + pc.total, pageW - marginX, y, { align:"right" });
+      y += 15;
+
+      if(plot.tasks.length === 0){
+        doc.setFontSize(9.5);
+        doc.setTextColor(160,175,175);
+        doc.text("(no tasks)", marginX + 26, y);
+        y += 14;
+      }
+
+      plot.tasks.forEach(task => {
+        newPageIfNeeded(16);
+        const box = task.done ? "[x]" : "[ ]";
+        doc.setFont("courier","normal");
+        doc.setFontSize(10.5);
+        doc.setTextColor(task.done ? 51 : 120, task.done ? 168 : 140, task.done ? 125 : 140);
+        doc.text(box, marginX + 26, y);
+
+        doc.setFont("helvetica","normal");
+        doc.setFontSize(11);
+        doc.setTextColor(30,58,58);
+        const nameX = marginX + 52;
+        const nameLines = doc.splitTextToSize(task.name || "(unnamed task)", pageW - marginX - nameX);
+        doc.text(nameLines, nameX, y);
+        y += 14 * nameLines.length;
+
+        const note = (task.note || "").trim();
+        if(note){
+          doc.setFont("helvetica","italic");
+          doc.setFontSize(9.5);
+          doc.setTextColor(120,140,140);
+          const noteLines = doc.splitTextToSize("Note: " + note, pageW - marginX - (nameX + 12));
+          noteLines.forEach(line => {
+            newPageIfNeeded(13);
+            doc.text(line, nameX + 12, y);
+            y += 12.5;
+          });
+          y += 2;
+        }
+      });
+      y += 6;
+    });
+    y += 10;
+  });
+
+  doc.save("Site-Progress-" + fileDate + ".pdf");
+  showToast("PDF exported");
+}
+
+/* ============================================================
+   Toast
+   ============================================================ */
+let toastTimer = null;
+function showToast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+/* ============================================================
+   Boot
+   ============================================================ */
+document.getElementById("export-btn").addEventListener("click", exportPDF);
+
+/* Persist just before the app is backgrounded/closed (belt & braces on top of debounced save) */
+window.addEventListener("pagehide", () => {
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
+});
+
+render();
+</script>
+</body>
+</html>
