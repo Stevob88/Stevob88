@@ -181,6 +181,55 @@
   }
   .task-name:focus{outline:none;background:var(--blue-soft);border-radius:6px;padding:5px 6px;}
   .task.checked .task-name{color:var(--ink-soft);text-decoration:line-through;text-decoration-color:var(--green-light);}
+
+  /* ---------- Time bar between phases ---------- */
+  .time-bar{
+    display:flex;align-items:center;gap:6px;
+    margin:0 0 0 40px;padding:3px 0 3px 10px;
+    border-left:2px dashed var(--blue);
+    color:var(--blue-dark);font-size:12.5px;font-weight:700;
+  }
+  .time-bar svg{width:14px;height:14px;}
+
+  /* ---------- Summary sections (Completed / Logs) ---------- */
+  .summary .summary-title{display:flex;align-items:center;gap:9px;}
+  .summary-ico{display:flex;flex-shrink:0;}
+  .summary-ico svg{width:22px;height:22px;}
+  .completed-summary .summary-ico{color:var(--green);}
+  .logs-summary .summary-ico{color:var(--blue-dark);}
+  .summary-name{font-family:'Archivo',sans-serif;font-weight:700;font-size:18px;letter-spacing:-.2px;}
+  .completed-summary{border-color:#CDEFE0;}
+  .logs-summary{border-color:#D3ECF2;}
+  .empty-note{padding:14px 10px;color:var(--ink-soft);font-size:14px;line-height:1.5;}
+  .sum-row{
+    display:flex;align-items:center;gap:10px;
+    border:1px solid var(--line);border-radius:12px;background:#FCFEFD;
+    padding:11px 12px;margin-bottom:10px;
+  }
+  .sum-row:last-child{margin-bottom:0;}
+  .sum-info{flex:1;min-width:0;}
+  .sum-name{font-weight:700;font-size:15.5px;color:var(--ink);}
+  .sum-meta{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
+  .sum-restore{
+    flex-shrink:0;display:inline-flex;align-items:center;gap:5px;
+    border:1px solid var(--line);border-radius:9px;background:#fff;
+    color:var(--ink-soft);font-family:inherit;font-size:13px;font-weight:600;
+    padding:7px 10px;cursor:pointer;
+  }
+  .sum-restore svg{width:15px;height:15px;}
+  .log-body .log-row{
+    display:flex;align-items:center;gap:10px;
+    padding:9px 4px;border-top:1px solid var(--line);
+  }
+  .log-body .log-row:first-child{border-top:none;}
+  .log-task{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .log-name{font-size:15px;font-weight:600;color:var(--ink);}
+  .log-stage{font-size:12px;color:var(--ink-soft);}
+  .log-dur{
+    flex-shrink:0;font-size:12.5px;font-weight:700;padding:3px 9px;border-radius:99px;
+    background:var(--blue-soft);color:var(--blue-dark);
+  }
+
   .note-area{display:none;margin-top:6px;}
   .note-area.show{display:block;}
   .note-area textarea{
@@ -297,6 +346,9 @@ const ICON = {
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/><path d="M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13"/></svg>',
   plus:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>',
   arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  medal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3l4 6 4-6"/><circle cx="12" cy="15" r="6"/><path d="M12 13v4M10 15h4"/></svg>',
+  undo:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l-4-4 4-4"/><path d="M5 10h10a4 4 0 010 8h-3"/></svg>',
 };
 
 /* ============================================================
@@ -335,7 +387,7 @@ function buildSeed(){
       id: uid(),
       name: "Plot " + n,
       open: false,
-      tasks: preset.map(t => ({ id: uid(), name: t, done: false, note: "", noteOpen: false }))
+      tasks: preset.map(t => ({ id: uid(), name: t, done: false, doneAt: null, note: "", noteOpen: false }))
     }))
   }));
 }
@@ -345,13 +397,25 @@ function buildSeed(){
 function tasksFromStage(stage){
   let names = (stage.preset && stage.preset.length) ? stage.preset.slice() : [];
   if(!names.length && stage.plots[0]) names = stage.plots[0].tasks.map(t => t.name);
-  return names.map(n => ({ id: uid(), name: n, done: false, note: "", noteOpen: false }));
+  return names.map(n => ({ id: uid(), name: n, done: false, doneAt: null, note: "", noteOpen: false }));
 }
 
 /* ============================================================
    State + persistence
    ============================================================ */
+const TIMELINE_KEY = "siteProgress.timeline.v1";   /* { plotName: [ {stage, task, at} ] } */
+const COMPLETED_KEY = "siteProgress.completed.v1"; /* [ { name, at, plot } ] */
+
 let state = load();
+let timeline = loadJSON(TIMELINE_KEY, {});
+let completed = loadJSON(COMPLETED_KEY, []);
+let completedOpen = false, logsOpen = false;
+const logsExpanded = new Set();
+
+function loadJSON(key, dflt){
+  try{ const r = localStorage.getItem(key); if(r) return JSON.parse(r); }catch(e){ console.warn("load failed", key, e); }
+  return dflt;
+}
 
 function load(){
   try{
@@ -376,7 +440,7 @@ function migrate(stages){
       s.preset = PRESETS[s.name].slice();
       s.plots.forEach(p => {
         if(!p.tasks || !p.tasks.length){
-          p.tasks = s.preset.map(n => ({ id: uid(), name: n, done: false, note: "", noteOpen: false }));
+          p.tasks = s.preset.map(n => ({ id: uid(), name: n, done: false, doneAt: null, note: "", noteOpen: false }));
         }
       });
     }
@@ -399,6 +463,7 @@ function normalize(stages){
         id: t.id || uid(),
         name: t.name || "",
         done: !!t.done,
+        doneAt: (typeof t.doneAt === "number") ? t.doneAt : null,
         note: t.note || "",
         noteOpen: !!t.noteOpen
       }))
@@ -409,10 +474,60 @@ function normalize(stages){
 let saveTimer = null;
 function save(){
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
-    catch(e){ console.warn("save failed", e); }
-  }, 120);
+  saveTimer = setTimeout(saveNow, 120);
+}
+function saveNow(){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    localStorage.setItem(TIMELINE_KEY, JSON.stringify(timeline));
+    localStorage.setItem(COMPLETED_KEY, JSON.stringify(completed));
+  }catch(e){ console.warn("save failed", e); }
+}
+
+/* ============================================================
+   Timeline + completion helpers
+   ============================================================ */
+function nowMs(){ return Date.now(); }
+
+function logEvent(plotName, stageName, taskName, at){
+  if(!timeline[plotName]) timeline[plotName] = [];
+  timeline[plotName].push({ stage: stageName, task: taskName, at });
+}
+function unlogEvent(plotName, stageName, taskName){
+  const arr = timeline[plotName];
+  if(!arr) return;
+  for(let i = arr.length - 1; i >= 0; i--){
+    if(arr[i].stage === stageName && arr[i].task === taskName){ arr.splice(i, 1); break; }
+  }
+}
+function isCML(name){ return (name || "").trim().toLowerCase() === "cml"; }
+
+function completePlot(stage, plot){
+  completed.push({ name: plot.name, at: nowMs(), plot: JSON.parse(JSON.stringify(plot)) });
+  stage.plots = stage.plots.filter(p => p.id !== plot.id);
+}
+function restorePlot(name){
+  const idx = completed.findIndex(c => c.name === name);
+  if(idx < 0) return;
+  const entry = completed.splice(idx, 1)[0];
+  const finals = state[state.length - 1];
+  const p = entry.plot || { id: uid(), name, open: false, tasks: tasksFromStage(finals) };
+  p.id = uid(); p.open = false;
+  (p.tasks || []).forEach(t => { if(isCML(t.name)){ t.done = false; t.doneAt = null; } });
+  unlogEvent(name, finals.name, "CML");
+  finals.plots.push(p);
+  finals.open = true;
+}
+
+/* Human-friendly duration, tuned for site work (days, then hours, then minutes) */
+function fmtDur(ms){
+  if(ms == null) return "";
+  if(ms < 0) ms = 0;
+  const d = ms / 86400000;
+  if(d >= 1) return (Math.round(d * 10) / 10).toString().replace(/\.0$/, "") + "d";
+  const h = ms / 3600000;
+  if(h >= 1) return Math.round(h) + "h";
+  return Math.max(1, Math.round(ms / 60000)) + "m";
 }
 
 /* ============================================================
@@ -449,12 +564,171 @@ function render(){
   addStage.id = "add-stage-btn";
   addStage.innerHTML = ICON.plus + " Add stage";
   addStage.onclick = () => {
-    state.push({ id: uid(), name: "New stage", open: true, plots: [] });
+    state.push({ id: uid(), name: "New stage", open: true, preset: [], plots: [] });
     save(); render();
   };
   app.appendChild(addStage);
 
+  app.appendChild(renderCompletedSection());
+  app.appendChild(renderLogsSection());
+
   renderOverall();
+}
+
+/* Small "time bar" shown between two completed phases */
+function timeBar(label){
+  const el = document.createElement("div");
+  el.className = "time-bar";
+  el.innerHTML = ICON.clock + "<span>" + label + "</span>";
+  return el;
+}
+
+/* Ordered completion events for a plot name (across every stage it has passed through) */
+function plotEvents(name){
+  return (timeline[name] || []).slice().sort((a, b) => a.at - b.at);
+}
+function plotTotal(name){
+  const ev = plotEvents(name);
+  return ev.length >= 2 ? ev[ev.length - 1].at - ev[0].at : 0;
+}
+
+function summaryHead(titleText, iconSvg, count, open, onToggle){
+  const head = document.createElement("div");
+  head.className = "stage-head";
+  head.innerHTML = ICON.chev;
+  const title = document.createElement("div");
+  title.className = "stage-title summary-title";
+  title.innerHTML = '<span class="summary-ico">' + iconSvg + "</span>";
+  const h = document.createElement("span");
+  h.className = "summary-name";
+  h.textContent = titleText;
+  title.appendChild(h);
+  const chip = document.createElement("span");
+  chip.className = "chip";
+  chip.textContent = count;
+  head.appendChild(title);
+  head.appendChild(chip);
+  head.onclick = onToggle;
+  return head;
+}
+
+function renderCompletedSection(){
+  const el = document.createElement("div");
+  el.className = "stage summary completed-summary" + (completedOpen ? " open" : "");
+  el.appendChild(summaryHead("Completed Plots", ICON.medal, completed.length, completedOpen,
+    () => { completedOpen = !completedOpen; save(); el.classList.toggle("open", completedOpen); }));
+
+  const body = document.createElement("div");
+  body.className = "stage-body";
+  if(!completed.length){
+    body.appendChild(emptyNote("No completed plots yet. Tick a plot's “CML” task and it lands here."));
+  } else {
+    completed.slice().sort((a, b) => b.at - a.at).forEach(c => {
+      const row = document.createElement("div");
+      row.className = "sum-row";
+      const info = document.createElement("div");
+      info.className = "sum-info";
+      const nm = document.createElement("div");
+      nm.className = "sum-name";
+      nm.textContent = c.name;
+      const meta = document.createElement("div");
+      meta.className = "sum-meta";
+      const total = plotTotal(c.name);
+      meta.textContent = "Completed " + fmtDate(c.at) + (total > 0 ? "  ·  build time " + fmtDur(total) : "");
+      info.appendChild(nm); info.appendChild(meta);
+      const restore = document.createElement("button");
+      restore.className = "sum-restore";
+      restore.innerHTML = ICON.undo + " Restore";
+      restore.setAttribute("aria-label", "Restore plot to Finals");
+      restore.onclick = () => {
+        if(confirm('Move "' + c.name + '" back into Finals?')){ restorePlot(c.name); saveNow(); render(); }
+      };
+      row.appendChild(info); row.appendChild(restore);
+      body.appendChild(row);
+    });
+  }
+  el.appendChild(body);
+  return el;
+}
+
+function renderLogsSection(){
+  const names = Object.keys(timeline).filter(n => (timeline[n] || []).length);
+  const el = document.createElement("div");
+  el.className = "stage summary logs-summary" + (logsOpen ? " open" : "");
+  el.appendChild(summaryHead("Plot Time Scale Logs", ICON.clock, names.length, logsOpen,
+    () => { logsOpen = !logsOpen; save(); el.classList.toggle("open", logsOpen); }));
+
+  const body = document.createElement("div");
+  body.className = "stage-body";
+  if(!names.length){
+    body.appendChild(emptyNote("No timings yet. As you tick tasks, each plot's phase durations are logged here."));
+  } else {
+    names.sort();
+    names.forEach(name => {
+      const isOpen = logsExpanded.has(name);
+      const card = document.createElement("div");
+      card.className = "plot" + (isOpen ? " open" : "");
+
+      const head = document.createElement("div");
+      head.className = "plot-head";
+      head.innerHTML = ICON.chev;
+      const nm = document.createElement("span");
+      nm.className = "plot-name";
+      nm.style.fontWeight = "700";
+      nm.textContent = name;
+      const total = plotTotal(name);
+      const badge = document.createElement("span");
+      badge.className = "frac";
+      badge.textContent = total > 0 ? fmtDur(total) : (timeline[name].length + "×");
+      head.appendChild(nm); head.appendChild(badge);
+      head.onclick = () => {
+        if(isOpen) logsExpanded.delete(name); else logsExpanded.add(name);
+        card.classList.toggle("open");
+        /* rebuild body lazily */
+        renderLogBody(logBody, name);
+      };
+      card.appendChild(head);
+
+      const logBody = document.createElement("div");
+      logBody.className = "plot-body log-body";
+      renderLogBody(logBody, name);
+      card.appendChild(logBody);
+      body.appendChild(card);
+    });
+  }
+  el.appendChild(body);
+  return el;
+}
+
+function renderLogBody(container, name){
+  container.innerHTML = "";
+  const ev = plotEvents(name);
+  ev.forEach((e, i) => {
+    const row = document.createElement("div");
+    row.className = "log-row";
+    const left = document.createElement("div");
+    left.className = "log-task";
+    left.innerHTML = '<span class="log-name"></span><span class="log-stage"></span>';
+    left.querySelector(".log-name").textContent = e.task;
+    left.querySelector(".log-stage").textContent = e.stage;
+    const dur = document.createElement("span");
+    dur.className = "log-dur";
+    dur.textContent = i === 0 ? "start" : fmtDur(e.at - ev[i - 1].at);
+    row.appendChild(left); row.appendChild(dur);
+    container.appendChild(row);
+  });
+}
+
+function emptyNote(text){
+  const n = document.createElement("div");
+  n.className = "empty-note";
+  n.textContent = text;
+  return n;
+}
+
+function fmtDate(ms){
+  try{ return new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short" }); }
+  catch(e){ return ""; }
 }
 
 function renderOverall(){
@@ -588,13 +862,21 @@ function renderPlot(stage, plot){
 
   const body = document.createElement("div");
   body.className = "plot-body";
-  plot.tasks.forEach(task => body.appendChild(renderTask(stage, plot, task)));
+  plot.tasks.forEach((task, i) => {
+    body.appendChild(renderTask(stage, plot, task));
+    /* time bar between two consecutive completed phases */
+    const next = plot.tasks[i + 1];
+    if(task.done && next && next.done && typeof task.doneAt === "number" && typeof next.doneAt === "number"){
+      const gap = next.doneAt - task.doneAt;
+      if(gap > 0) body.appendChild(timeBar(fmtDur(gap)));
+    }
+  });
 
   const addTask = document.createElement("button");
   addTask.className = "add-btn add-task-btn";
   addTask.innerHTML = ICON.plus + " Add task";
   addTask.onclick = () => {
-    plot.tasks.push({ id: uid(), name: "", done:false, note:"", noteOpen:true });
+    plot.tasks.push({ id: uid(), name: "", done:false, doneAt:null, note:"", noteOpen:true });
     save(); render();
   };
   body.appendChild(addTask);
@@ -695,12 +977,20 @@ function renderTask(stage, plot, task){
   tick.setAttribute("aria-checked", task.done ? "true" : "false");
   tick.onclick = () => {
     task.done = !task.done;
-    save();
-    /* light-weight in-place update to avoid collapsing focus */
-    el.classList.toggle("checked", task.done);
-    tick.classList.toggle("on", task.done);
-    tick.setAttribute("aria-checked", task.done ? "true" : "false");
-    refreshCounts();
+    if(task.done){
+      task.doneAt = nowMs();
+      logEvent(plot.name, stage.name, task.name, task.doneAt);
+      if(isCML(task.name)){
+        completePlot(stage, plot);
+        saveNow(); render();
+        showToast('"' + plot.name + '" complete → Completed Plots');
+        return;
+      }
+    } else {
+      unlogEvent(plot.name, stage.name, task.name);
+      task.doneAt = null;
+    }
+    saveNow(); render();
   };
 
   /* main */
@@ -926,9 +1216,7 @@ function showToast(msg){
 document.getElementById("export-btn").addEventListener("click", exportPDF);
 
 /* Persist just before the app is backgrounded/closed (belt & braces on top of debounced save) */
-window.addEventListener("pagehide", () => {
-  try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
-});
+window.addEventListener("pagehide", saveNow);
 
 render();
 </script>
