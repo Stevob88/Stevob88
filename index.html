@@ -261,6 +261,7 @@
 
   .stage-tools{display:flex;gap:8px;margin-top:4px;}
   .stage-tools .add-btn{margin-top:0;flex:1;}
+  .build-tag{text-align:center;color:var(--ink-soft);font-size:11px;opacity:.65;padding:10px 0 2px;}
 
   .plot-del-row{display:flex;justify-content:flex-end;margin-top:2px;}
   .del-plot{
@@ -330,6 +331,9 @@
 
 <script>
 "use strict";
+
+/* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
+const BUILD = "build 12 · 11 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -599,6 +603,11 @@ function render(){
 
   app.appendChild(renderCompletedSection());
   app.appendChild(renderLogsSection());
+
+  const tag = document.createElement("div");
+  tag.className = "build-tag";
+  tag.textContent = "Site Progress · " + BUILD;
+  app.appendChild(tag);
 
   renderOverall();
 }
