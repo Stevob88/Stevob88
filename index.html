@@ -491,7 +491,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 21 · 13 Aug";
+const BUILD = "build 22 · 13 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -522,8 +522,8 @@ const SEED = [
   ["Foundations",        ["Groundworker","Steel","NHBC Foundations","Concrete"]],
   ["Substructure",       ["Blockwork","drainage","NHBC Drainage","Block and Beam","Insulation","Pour Slab","Soleplate","Splash","Scaff Matt"]],
   ["Superstructure",     ["Scaffold","Crane","Timberframe","Oregon Externals"]],
-  ["Brickwork",          ["Brickwork 1st Lift","NHBC Super Inspection","Brickwork 2nd Lift","Scaffold Adaption","Brickwork Eaves + Gable","Window Detape","Down Pipes","Scaffold Dismantle"], true],
-  ["Roof",               ["Felt & Batten","Pv Panel","Roof tile"]],
+  ["Brickwork",          ["Brickwork 1st Lift","Fire photo","NHBC Super Inspection","Brickwork 2nd Lift","Scaffold Adaption","Brickwork Eaves + Gable","Window Detape","Down Pipes","Scaffold Dismantle"], true],
+  ["Roof",               ["Felt & Batten","Fire photo","Pv Panel","Roof tile"]],
   ["1st Fix",            ["Joiner Prefix","Electrician Prefix","Plumber Prefix","VCL","Joiner 1st Fix","Plumber 1st Fix","Electrician 1st Fix","Party Wall","Windows","Joiner Dropbacks","Barratt","NHBC Preplaster"]],
   ["Plasterboard",       ["Boarder","Taper","MF Ceiling"]],
   ["2nd Fix",            ["Mistcoat","Joiner 2nd fix","Plumber 2nd fix","Electrician 2nd fix","wall tiler","Kitchen","Patcher"]],
@@ -701,6 +701,30 @@ function migrate(stages){
         });
       }
       localStorage.setItem("siteProgress.brickwork.v2", "1");
+      localStorage.setItem(STORE_KEY, JSON.stringify(stages));
+    }
+  }catch(e){}
+
+  /* one-time: add 'Fire photo' after Brickwork 1st Lift and after Felt & Batten */
+  try{
+    if(!localStorage.getItem("siteProgress.firephoto.v1")){
+      const norm = n => (n || "").trim().toLowerCase();
+      const addAfter = (stage, anchor) => {
+        if(!stage) return;
+        if(stage.preset && !stage.preset.some(n => norm(n) === "fire photo")){
+          const i = stage.preset.findIndex(n => norm(n) === norm(anchor));
+          stage.preset.splice(i >= 0 ? i + 1 : 0, 0, "Fire photo");
+        }
+        stage.plots.forEach(p => {
+          if(p.tasks.some(t => norm(t.name) === "fire photo")) return;
+          const i = p.tasks.findIndex(t => norm(t.name) === norm(anchor));
+          p.tasks.splice(i >= 0 ? i + 1 : 0, 0,
+            { id: uid(), name: "Fire photo", done: false, doneAt: null, due: null, note: "", noteOpen: false });
+        });
+      };
+      addAfter(stages.find(s => s.basic && norm(s.name) === "brickwork"), "Brickwork 1st Lift");
+      addAfter(stages.find(s => s.progNo === 4), "Felt & Batten");
+      localStorage.setItem("siteProgress.firephoto.v1", "1");
       localStorage.setItem(STORE_KEY, JSON.stringify(stages));
     }
   }catch(e){}
