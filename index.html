@@ -487,7 +487,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 16 · 12 Aug";
+const BUILD = "build 17 · 12 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -960,23 +960,51 @@ function claimLabel(ci){
   return "claim " + fmtDay(ci.claim) + " · " + ci.days + "d";
 }
 
-function progChip(plot, stageIdx){
-  if(!plot.prog) return null;
-  const due = plot.prog.est && plot.prog.est[String(stageIdx + 1)];
-  if(!due){
-    if(plot.prog.notStarted){
-      const c = document.createElement("span");
-      c.className = "due-chip grey";
-      c.textContent = "not started";
-      return c;
+/* How many days ahead of programme this plot is, measured against the last
+   completed stage: the plot sits at stage stageIdx+1, so stage stageIdx is done —
+   the programme scheduled that stage's claim for a date still in the future. */
+function daysAhead(plot, stageIdx){
+  const pr = plot.prog;
+  if(!pr || !pr.est || !pr.current) return 0;
+  const appStage = stageIdx + 1;
+  if(appStage <= pr.current) return 0;              /* level with or behind programme */
+  for(let k = stageIdx; k >= pr.current; k--){      /* highest completed stage with a programmed week */
+    const due = pr.est[String(k)];
+    if(due){
+      const d = daysBetween(todayStr(), claimInfo(due).claim);
+      return d > 0 ? d : 0;
     }
-    return null;
   }
-  const ci = claimInfo(due);
-  const chip = document.createElement("span");
-  chip.className = "due-chip" + (ci.st === "over" ? " over" : (ci.st === "near" || ci.st === "today") ? " today" : "");
-  chip.textContent = claimLabel(ci);
-  return chip;
+  return 0;
+}
+
+function aheadChip(days){
+  const c = document.createElement("span");
+  c.className = "due-chip met";
+  c.textContent = days + "d ahead";
+  return c;
+}
+
+/* Returns 0-2 chips for a plot row: green "Nd ahead" and/or the claim countdown */
+function progChips(plot, stageIdx){
+  const out = [];
+  if(!plot.prog) return out;
+  const ahead = daysAhead(plot, stageIdx);
+  if(ahead > 0) out.push(aheadChip(ahead));
+  const due = plot.prog.est && plot.prog.est[String(stageIdx + 1)];
+  if(due){
+    const ci = claimInfo(due);
+    const chip = document.createElement("span");
+    chip.className = "due-chip" + (ci.st === "over" ? " over" : (ci.st === "near" || ci.st === "today") ? " today" : "");
+    chip.textContent = claimLabel(ci);
+    out.push(chip);
+  } else if(!out.length && plot.prog.notStarted){
+    const c = document.createElement("span");
+    c.className = "due-chip grey";
+    c.textContent = "not started";
+    out.push(c);
+  }
+  return out;
 }
 
 function applyProgram(parsed){
@@ -996,7 +1024,7 @@ function applyProgram(parsed){
     const rec = parsed.plots[n];
     const name = "Plot " + n;
     progNames.add(name);
-    const prog = { house: rec.house || "", est: rec.est, notStarted: !!rec.notStarted };
+    const prog = { house: rec.house || "", est: rec.est, current: rec.current, notStarted: !!rec.notStarted };
     if(rec.completed){
       if(!completedNames.has(name)){
         const at = rec.act && rec.act[9] ? new Date(rec.act[9] + "T12:00:00").getTime() : Date.now();
@@ -1118,7 +1146,10 @@ function renderProgSection(){
       const chip = document.createElement("span");
       chip.className = "due-chip" + (r.ci.st === "over" ? " over" : (r.ci.st === "near" || r.ci.st === "today") ? " today" : "");
       chip.textContent = claimLabel(r.ci);
-      row.appendChild(info2); row.appendChild(chip);
+      row.appendChild(info2);
+      const ah = daysAhead(r.p, r.si);
+      if(ah > 0) row.appendChild(aheadChip(ah));
+      row.appendChild(chip);
       row.onclick = () => {
         r.stage.open = true; r.p.open = true; save(); render();
         requestAnimationFrame(() => {
@@ -1466,8 +1497,7 @@ function renderPlot(stage, plot){
   frac.textContent = done + "/" + total;
 
   head.appendChild(nameInput);
-  const claimC = progChip(plot, si);       /* programme claim-by chip for this stage */
-  if(claimC) head.appendChild(claimC);
+  progChips(plot, si).forEach(c => head.appendChild(c));   /* ahead + claim chips */
   head.appendChild(frac);
   head.onclick = () => {
     if(head.__swiped) return;              /* was a horizontal swipe — ignore the tap */
@@ -2152,9 +2182,40 @@ document.getElementById("export-btn").addEventListener("click", exportPDF);
 /* Persist just before the app is backgrounded/closed (belt & braces on top of debounced save) */
 window.addEventListener("pagehide", saveNow);
 
+/* ---- self-update: fetch a fresh copy of this page and reload if the build is newer ---- */
+function checkForUpdate(){
+  try{
+    if(location.protocol === "file:") return;
+    fetch(location.href, { cache: "reload" })
+      .then(r => (r && r.ok) ? r.text() : null)
+      .then(html => {
+        if(!html) return;
+        const m = html.match(/const BUILD = "build (\d+)/);
+        const cur = parseInt((BUILD.match(/build (\d+)/) || [0, 0])[1], 10);
+        if(!m || parseInt(m[1], 10) <= cur) return;
+        try{                                        /* avoid reload loops if an edge cache lags */
+          if(sessionStorage.getItem("siteProgress.updSeen") === m[1]) return;
+          sessionStorage.setItem("siteProgress.updSeen", m[1]);
+        }catch(e){}
+        saveNow();
+        showToast("Updating to build " + m[1] + "…");
+        setTimeout(() => location.reload(), 900);
+      })
+      .catch(() => {});
+  }catch(e){}
+}
+let lastUpdCheck = Date.now();
+document.addEventListener("visibilitychange", () => {
+  if(document.visibilityState === "visible" && Date.now() - lastUpdCheck > 600000){
+    lastUpdCheck = Date.now();
+    checkForUpdate();
+  }
+});
+
 planBind();
 bindProgram();
 render();
+checkForUpdate();
 </script>
 </body>
 </html>
