@@ -491,7 +491,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 23 · 13 Aug";
+const BUILD = "build 24 · 13 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -1093,11 +1093,13 @@ function claimInfo(due){
   return { claim: claim, st: st, days: days };
 }
 
-/* Chip wording incl. countdown: "claim Fri, Aug 28 · 16d" / "claim today" / "was Fri, Aug 14 · 3d over" */
-function claimLabel(ci){
-  if(ci.st === "today") return "claim today";
-  if(ci.st === "over")  return "was " + fmtDay(ci.claim) + " · " + (-ci.days) + "d over";
-  return "claim " + fmtDay(ci.claim) + " · " + ci.days + "d";
+/* Chip wording incl. stage + countdown: "claim S5 Fri, Aug 28 · 16d" / "claim S5 today" /
+   "was S5 Fri, Aug 14 · 3d over" */
+function claimLabel(ci, stageNo){
+  const s = stageNo ? "S" + stageNo + " " : "";
+  if(ci.st === "today") return "claim " + s + "today";
+  if(ci.st === "over")  return "was " + s + fmtDay(ci.claim) + " · " + (-ci.days) + "d over";
+  return "claim " + s + fmtDay(ci.claim) + " · " + ci.days + "d";
 }
 
 /* How many days ahead of programme this plot is, measured against the last
@@ -1137,7 +1139,7 @@ function progChips(plot, stage){
     const ci = claimInfo(due);
     const chip = document.createElement("span");
     chip.className = "due-chip" + (ci.st === "over" ? " over" : (ci.st === "near" || ci.st === "today") ? " today" : "");
-    chip.textContent = claimLabel(ci);
+    chip.textContent = claimLabel(ci, stage.progNo);
     out.push(chip);
   } else if(!out.length && plot.prog.notStarted){
     const c = document.createElement("span");
@@ -1299,7 +1301,7 @@ function renderProgSection(){
       info2.appendChild(t); info2.appendChild(w);
       const chip = document.createElement("span");
       chip.className = "due-chip" + (r.ci.st === "over" ? " over" : (r.ci.st === "near" || r.ci.st === "today") ? " today" : "");
-      chip.textContent = claimLabel(r.ci);
+      chip.textContent = claimLabel(r.ci, r.stage.progNo);
       row.appendChild(info2);
       const ah = daysAhead(r.p, r.stage);
       if(ah > 0) row.appendChild(aheadChip(ah));
@@ -1981,8 +1983,8 @@ function exportPDF(){
         if(due){
           const ci = claimInfo(due);
           bits.push({
-            t: ci.st === "over" ? "claim was due " + fmtDay(ci.claim) + " (" + (-ci.days) + "d over)"
-                                : "claim by " + fmtDay(ci.claim) + (ci.st === "today" ? " (today)" : " (" + ci.days + "d)"),
+            t: ci.st === "over" ? "claim S" + stage.progNo + " was due " + fmtDay(ci.claim) + " (" + (-ci.days) + "d over)"
+                                : "claim S" + stage.progNo + " by " + fmtDay(ci.claim) + (ci.st === "today" ? " (today)" : " (" + ci.days + "d)"),
             c: ci.st === "over" ? [194,83,83] : ci.st === "near" || ci.st === "today" ? [169,118,26] : [58,168,188]
           });
         }
