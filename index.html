@@ -491,7 +491,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 19 · 12 Aug";
+const BUILD = "build 20 · 13 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -514,11 +514,15 @@ const ICON = {
    Default seed data
    ============================================================ */
 /* Each stage carries a "preset" — the trade tasks auto-added to any plot that is
-   created in, or moved into, that stage. */
+   created in, or moved into, that stage.
+   Third element true = a "basic" header: outside the programme flow entirely
+   (no claim dates, no ahead/behind, ignored by weekly uploads, manual plots,
+   duplicates allowed, and swipes skip over it). */
 const SEED = [
   ["Foundations",        ["Groundworker","Steel","NHBC Foundations","Concrete"]],
   ["Substructure",       ["Blockwork","drainage","NHBC Drainage","Block and Beam","Insulation","Pour Slab","Soleplate","Splash","Scaff Matt"]],
-  ["Superstructure",     ["Scaffold","Crane","Timberframe","Oregon Externals","Brickwork","NHBC Superstructure"]],
+  ["Superstructure",     ["Scaffold","Crane","Timberframe","Oregon Externals"]],
+  ["Brickwork",          ["Brickwork","NHBC Superstructure","Window Detape","Down Pipes","Scaffold Dismantle"], true],
   ["Roof",               ["Felt & Batten","Pv Panel","Roof tile"]],
   ["1st Fix",            ["Joiner Prefix","Electrician Prefix","Plumber Prefix","VCL","Joiner 1st Fix","Plumber 1st Fix","Electrician 1st Fix","Party Wall","Windows","Joiner Dropbacks","Barratt","NHBC Preplaster"]],
   ["Plasterboard",       ["Boarder","Taper","MF Ceiling"]],
@@ -526,6 +530,8 @@ const SEED = [
   ["Paint & Decoration", ["Painter"]],
   ["Finals",             ["Build clean","Mastic","Joiner Final","Electrician Final","PV Commission","Plumber final","Flooring","Patcher final","Paint final","Appliances","Reclean","All Trade Snags","CML"]],
 ];
+/* Canonical order of the nine programme flow stages -> progNo 1..9 */
+const FLOW_NAMES = ["Foundations","Substructure","Superstructure","Roof","1st Fix","Plasterboard","2nd Fix","Paint & Decoration","Finals"];
 
 /* Presets keyed by stage name, plus renames of earlier default names.
    Used to non-destructively backfill presets onto existing saved data. */
@@ -537,12 +543,15 @@ let uidCounter = 0;
 const uid = () => "id" + (Date.now().toString(36)) + (uidCounter++).toString(36) + Math.floor(performance.now()).toString(36);
 
 function buildSeed(){
-  return SEED.map(([name, preset]) => ({
+  let flowNo = 0;
+  return SEED.map(([name, preset, basic]) => ({
     id: uid(),
     name,
     open: false,
+    basic: !!basic,
+    progNo: basic ? null : ++flowNo,
     preset: preset.slice(),
-    plots: [1,2].map(n => ({
+    plots: basic ? [] : [1,2].map(n => ({
       id: uid(),
       name: "Plot " + n,
       open: false,
@@ -598,11 +607,14 @@ function restoreMissingStages(stages){
   try{ if(localStorage.getItem(RESTORE_FLAG)) return stages; }catch(e){}
   const key = s => (s || "").trim().toLowerCase();
   let changed = false;
-  SEED.forEach(([name, preset], i) => {
+  SEED.forEach(([name, preset, basic], i) => {
     if(stages.some(s => key(s.name) === key(name))) return;
+    const flowIdx = FLOW_NAMES.indexOf(name);
     const fresh = {
-      id: uid(), name, open: false, preset: preset.slice(),
-      plots: [1, 2].map(n => ({
+      id: uid(), name, open: false, basic: !!basic,
+      progNo: basic ? null : (flowIdx >= 0 ? flowIdx + 1 : null),
+      preset: preset.slice(),
+      plots: basic ? [] : [1, 2].map(n => ({
         id: uid(), name: "Plot " + n, open: false,
         tasks: preset.map(t => ({ id: uid(), name: t, done: false, doneAt: null, due: null, note: "", noteOpen: false }))
       }))
@@ -639,6 +651,40 @@ function migrate(stages){
       });
     }
   });
+
+  /* assign programme flow numbers by canonical stage name (index-independent) */
+  stages.forEach(s => {
+    if(s.progNo == null && !s.basic){
+      const i = FLOW_NAMES.indexOf((s.name || "").trim());
+      if(i >= 0) s.progNo = i + 1;
+    }
+  });
+
+  /* one-time: split Brickwork out of Superstructure into its own basic header */
+  try{
+    if(!localStorage.getItem("siteProgress.brickwork.v1")){
+      if(!stages.some(s => (s.name || "").trim().toLowerCase() === "brickwork")){
+        const supIdx = stages.findIndex(s => s.progNo === 3);
+        stages.splice(supIdx >= 0 ? supIdx + 1 : 3, 0, {
+          id: uid(), name: "Brickwork", open: false, basic: true, progNo: null,
+          preset: PRESETS["Brickwork"].slice(), plots: []
+        });
+      }
+      localStorage.setItem("siteProgress.brickwork.v1", "1");
+      localStorage.setItem(STORE_KEY, JSON.stringify(stages));
+    }
+  }catch(e){}
+
+  /* keep Superstructure clean: the split-out tasks leave its preset, and leave
+     existing plots' checklists unless already ticked (history is kept) */
+  const STRIP = /^(brickwork|nhbc superstructure)$/i;
+  const sup = stages.find(s => s.progNo === 3);
+  if(sup){
+    sup.preset = (sup.preset || []).filter(n => !STRIP.test((n || "").trim()));
+    sup.plots.forEach(p => {
+      p.tasks = p.tasks.filter(t => t.done || !STRIP.test((t.name || "").trim()));
+    });
+  }
   return stages;
 }
 
@@ -648,6 +694,8 @@ function normalize(stages){
     id: s.id || uid(),
     name: s.name || "Stage",
     open: !!s.open,
+    basic: !!s.basic,
+    progNo: (typeof s.progNo === "number") ? s.progNo : null,
     preset: Array.isArray(s.preset) ? s.preset.slice() : [],
     plots: (s.plots || []).map(p => ({
       id: p.id || uid(),
@@ -707,7 +755,7 @@ function restorePlot(name){
   const idx = completed.findIndex(c => c.name === name);
   if(idx < 0) return;
   const entry = completed.splice(idx, 1)[0];
-  const finals = state[state.length - 1];
+  const finals = state.find(x => x.progNo === 9) || state[state.length - 1];
   const p = entry.plot || { id: uid(), name, open: false, tasks: tasksFromStage(finals) };
   p.id = uid(); p.open = false;
   (p.tasks || []).forEach(t => { if(isCML(t.name)){ t.done = false; t.doneAt = null; } });
@@ -965,14 +1013,15 @@ function claimLabel(ci){
 }
 
 /* How many days ahead of programme this plot is, measured against the last
-   completed stage: the plot sits at stage stageIdx+1, so stage stageIdx is done —
+   completed stage: the plot sits at flow stage `progNo`, so stage progNo-1 is done —
    the programme scheduled that stage's claim for a date still in the future. */
-function daysAhead(plot, stageIdx){
+function daysAhead(plot, stage){
   const pr = plot.prog;
+  if(!stage || stage.basic || !stage.progNo) return 0;
   if(!pr || !pr.est || !pr.current) return 0;
-  const appStage = stageIdx + 1;
+  const appStage = stage.progNo;
   if(appStage <= pr.current) return 0;              /* level with or behind programme */
-  for(let k = stageIdx; k >= pr.current; k--){      /* highest completed stage with a programmed week */
+  for(let k = appStage - 1; k >= pr.current; k--){  /* highest completed stage with a programmed week */
     const due = pr.est[String(k)];
     if(due){
       const d = daysBetween(todayStr(), claimInfo(due).claim);
@@ -990,12 +1039,12 @@ function aheadChip(days){
 }
 
 /* Returns 0-2 chips for a plot row: green "Nd ahead" and/or the claim countdown */
-function progChips(plot, stageIdx){
+function progChips(plot, stage){
   const out = [];
-  if(!plot.prog) return out;
-  const ahead = daysAhead(plot, stageIdx);
+  if(!plot.prog || !stage || stage.basic || !stage.progNo) return out;
+  const ahead = daysAhead(plot, stage);
   if(ahead > 0) out.push(aheadChip(ahead));
-  const due = plot.prog.est && plot.prog.est[String(stageIdx + 1)];
+  const due = plot.prog.est && plot.prog.est[String(stage.progNo)];
   if(due){
     const ci = claimInfo(due);
     const chip = document.createElement("span");
@@ -1015,11 +1064,19 @@ function applyProgram(parsed){
   const firstTime = !programData;
   if(firstTime){                       /* replacing the sample data completely */
     timeline = {}; completed = [];
-    state.forEach(s => { s.plots = []; });
+    state.forEach(s => { if(!s.basic) s.plots = []; });
   }
+  /* programme stage number -> state index (basic headers are invisible here) */
+  const idxByProgNo = {};
+  state.forEach((s, si) => { if(!s.basic && s.progNo) idxByProgNo[s.progNo] = si; });
+  const firstFlowIdx = state.findIndex(s => !s.basic);
+
   const progNames = new Set();
   const existingByName = {};
-  state.forEach((s, si) => s.plots.forEach(p => { existingByName[p.name] = { si: si, p: p }; }));
+  state.forEach((s, si) => {
+    if(s.basic) return;                /* plots in basic headers are never matched or moved */
+    s.plots.forEach(p => { existingByName[p.name] = { si: si, p: p }; });
+  });
   const completedNames = new Set(completed.map(c => c.name));
   const newPlots = state.map(() => []);
   const nums = Object.keys(parsed.plots).map(Number).sort((a, b) => a - b);
@@ -1036,7 +1093,8 @@ function applyProgram(parsed){
       }
       return;
     }
-    const target = Math.min(Math.max(rec.current, 1), state.length) - 1;
+    const cur = Math.min(Math.max(rec.current, 1), 9);
+    const target = (idxByProgNo[cur] != null) ? idxByProgNo[cur] : firstFlowIdx;
     const ex = existingByName[name];
     if(ex && ex.si >= target){         /* app is level or ahead — keep position and ticks */
       ex.p.prog = prog;
@@ -1047,13 +1105,16 @@ function applyProgram(parsed){
   });
 
   /* keep any custom plots the programme doesn't know about */
-  state.forEach((s, si) => s.plots.forEach(p => { if(!progNames.has(p.name)) newPlots[si].push(p); }));
+  state.forEach((s, si) => {
+    if(s.basic) return;
+    s.plots.forEach(p => { if(!progNames.has(p.name)) newPlots[si].push(p); });
+  });
   newPlots.forEach(a => a.sort((x, y) => {
     const nx = parseInt((x.name.match(/\d+/) || ["9999"])[0], 10);
     const ny = parseInt((y.name.match(/\d+/) || ["9999"])[0], 10);
     return nx - ny;
   }));
-  state.forEach((s, i) => { s.plots = newPlots[i]; });
+  state.forEach((s, i) => { if(!s.basic) s.plots = newPlots[i]; });
 
   programData = { uploadedAt: Date.now(), window: parsed.window, counts: parsed.counts };
   progOpen = true;
@@ -1088,11 +1149,12 @@ function pickProgram(){ document.getElementById("prog-file").click(); }
 function renderProgSection(){
   /* rows: every active plot whose current stage has a programmed week */
   const rows = [];
-  state.forEach((stage, si) => stage.plots.forEach(p => {
+  state.forEach(stage => stage.plots.forEach(p => {
+    if(stage.basic || !stage.progNo) return;         /* basic headers stay out of the programme */
     if(!p.prog || !p.prog.est) return;
-    const due = p.prog.est[String(si + 1)];
+    const due = p.prog.est[String(stage.progNo)];
     if(!due) return;
-    rows.push({ p: p, stage: stage, si: si, due: due, ci: claimInfo(due) });
+    rows.push({ p: p, stage: stage, due: due, ci: claimInfo(due) });
   }));
   rows.sort((a, b) => a.ci.claim < b.ci.claim ? -1 : a.ci.claim > b.ci.claim ? 1 : 0);
   const over = rows.filter(r => r.ci.st === "over").length;
@@ -1145,13 +1207,13 @@ function renderProgSection(){
       t.textContent = r.p.name;
       const w = document.createElement("div");
       w.className = "due-where";
-      w.textContent = "S" + (r.si + 1) + " · " + r.stage.name;
+      w.textContent = "S" + r.stage.progNo + " · " + r.stage.name;
       info2.appendChild(t); info2.appendChild(w);
       const chip = document.createElement("span");
       chip.className = "due-chip" + (r.ci.st === "over" ? " over" : (r.ci.st === "near" || r.ci.st === "today") ? " today" : "");
       chip.textContent = claimLabel(r.ci);
       row.appendChild(info2);
-      const ah = daysAhead(r.p, r.si);
+      const ah = daysAhead(r.p, r.stage);
       if(ah > 0) row.appendChild(aheadChip(ah));
       row.appendChild(chip);
       row.onclick = () => {
@@ -1221,7 +1283,8 @@ function render(){
   addStage.id = "add-stage-btn";
   addStage.innerHTML = ICON.plus + " Add stage";
   addStage.onclick = () => {
-    state.push({ id: uid(), name: "New stage", open: true, preset: [], plots: [] });
+    /* user-added stages are basic: outside the programme flow, manual plots only */
+    state.push({ id: uid(), name: "New stage", open: true, basic: true, progNo: null, preset: [], plots: [] });
     save(); render();
   };
   app.appendChild(addStage);
@@ -1469,7 +1532,7 @@ function renderPlot(stage, plot){
   const { done, total } = plotCounts(plot);
 
   const si = state.indexOf(stage);
-  const nextStage = (si >= 0 && si < state.length - 1) ? state[si + 1] : null;
+  const nextStage = nextFlowStage(stage);            /* basic headers are skipped, and have no swipe */
 
   const swipe = document.createElement("div");
   swipe.className = "plot-swipe";
@@ -1502,7 +1565,7 @@ function renderPlot(stage, plot){
 
   head.appendChild(nameInput);
   head.appendChild(frac);
-  const chips = progChips(plot, si);                 /* ahead + claim chips on their own line */
+  const chips = progChips(plot, stage);                 /* ahead + claim chips on their own line */
   if(chips.length){
     const cw = document.createElement("div");
     cw.className = "plot-chips";
@@ -1601,10 +1664,20 @@ function attachSwipe(head, stage, plot){
   head.addEventListener("pointercancel", end);
 }
 
-function movePlotToNextStage(stage, plot){
+/* The next stage in the build flow, skipping basic headers (e.g. Brickwork).
+   Plots inside a basic header have no next stage — they are managed manually. */
+function nextFlowStage(stage){
   const si = state.indexOf(stage);
-  if(si < 0 || si >= state.length - 1){ showToast('"' + plot.name + '" is at the final stage'); return; }
-  const next = state[si + 1];
+  if(si < 0 || stage.basic) return null;
+  for(let i = si + 1; i < state.length; i++){
+    if(!state[i].basic) return state[i];
+  }
+  return null;
+}
+
+function movePlotToNextStage(stage, plot){
+  const next = nextFlowStage(stage);
+  if(!next){ showToast('"' + plot.name + '" is at the final stage'); return; }
   const c = plotCounts(plot);
   if(!confirm('Move "' + plot.name + '" (' + c.done + '/' + c.total + ' done) to "' + next.name + '"?')) return;
 
@@ -1811,12 +1884,12 @@ function exportPDF(){
       doc.setTextColor(120,140,140);
       doc.text(pc.done + "/" + pc.total, pageW - marginX, y, { align:"right" });
 
-      /* programme status: days ahead + claim-by date for this stage */
-      if(plot.prog){
+      /* programme status: days ahead + claim-by date for this stage (never for basic headers) */
+      if(plot.prog && !stage.basic && stage.progNo){
         const bits = [];
-        const ahead = daysAhead(plot, si);
+        const ahead = daysAhead(plot, stage);
         if(ahead > 0) bits.push({ t: ahead + "d ahead of programme", c: [51,168,125] });
-        const due = plot.prog.est && plot.prog.est[String(si + 1)];
+        const due = plot.prog.est && plot.prog.est[String(stage.progNo)];
         if(due){
           const ci = claimInfo(due);
           bits.push({
