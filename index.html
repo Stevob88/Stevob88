@@ -26,6 +26,9 @@
 <!-- jsPDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
+<!-- PDF.js — renders the attached site layout plan -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
 <style>
   :root{
     --bg:#EAF7F3;
@@ -238,9 +241,8 @@
     background:#fff;resize:vertical;min-height:44px;
   }
   .note-area textarea:focus{outline:none;border-color:var(--blue);}
-  .task-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0;align-items:center;}
   .icon-btn{
-    width:34px;height:34px;flex-shrink:0;border-radius:9px;border:1px solid var(--line);
+    width:33px;height:33px;flex-shrink:0;border-radius:9px;border:1px solid var(--line);
     background:#fff;color:var(--ink-soft);display:flex;align-items:center;justify-content:center;
     cursor:pointer;padding:0;
   }
@@ -296,6 +298,107 @@
     opacity:0;pointer-events:none;transition:all .3s ease;z-index:70;white-space:nowrap;
   }
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* ---------- Due dates ---------- */
+  .task-actions{display:flex;gap:6px;flex-shrink:0;align-items:flex-start;}
+  .due-btn{position:relative;overflow:hidden;}
+  .due-btn input[type="date"]{
+    position:absolute;inset:0;width:100%;height:100%;
+    opacity:0;border:none;padding:0;margin:0;cursor:pointer;
+  }
+  .icon-btn.due-set{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .icon-btn.due-today{background:var(--amber);border-color:var(--amber);color:#fff;}
+  .icon-btn.due-over{background:var(--danger);border-color:var(--danger);color:#fff;}
+  .due-chip{
+    display:inline-flex;align-items:center;gap:6px;margin-top:5px;
+    font-size:12.5px;font-weight:700;padding:4px 10px;border-radius:99px;
+    background:var(--blue-soft);color:var(--blue-dark);white-space:nowrap;
+  }
+  .due-chip.today{background:#FDF0D9;color:#A9761A;}
+  .due-chip.over{background:#FBE4E4;color:#C25353;}
+  .due-chip.met{background:var(--green-soft);color:var(--green);}
+  .due-chip.late{background:#FBE4E4;color:#C25353;}
+  .due-chip button{
+    border:none;background:transparent;color:inherit;font:inherit;
+    padding:0 0 0 2px;cursor:pointer;opacity:.7;font-size:14px;line-height:1;
+  }
+  .due-summary{border-color:#CFE6EE;}
+  .due-summary .summary-ico{color:var(--blue-dark);}
+  .due-summary .chip.alert{background:#FBE4E4;color:#C25353;}
+  .due-row{
+    display:flex;align-items:center;gap:10px;
+    padding:10px 4px;border-top:1px solid var(--line);
+  }
+  .due-row:first-child{border-top:none;}
+  .due-row .due-info{flex:1;min-width:0;}
+  .due-row .due-task{font-size:15px;font-weight:600;color:var(--ink);}
+  .due-row .due-where{font-size:12px;color:var(--ink-soft);margin-top:1px;}
+
+  /* ---------- Site plan button + viewer ---------- */
+  #plan-btn{
+    margin-left:auto;flex-shrink:0;display:inline-flex;align-items:center;gap:5px;
+    border:1px solid var(--line);border-radius:10px;background:#fff;
+    color:var(--blue-dark);font-family:inherit;font-size:13px;font-weight:700;
+    padding:8px 11px;cursor:pointer;
+  }
+  #plan-btn svg{width:16px;height:16px;}
+  .plan-overlay{
+    position:fixed;inset:0;z-index:100;background:#F4FAF8;
+    display:flex;flex-direction:column;
+  }
+  .plan-overlay[hidden]{display:none;}
+  .plan-bar{
+    display:flex;align-items:center;gap:10px;flex-shrink:0;
+    padding:calc(env(safe-area-inset-top) + 10px) 12px 10px;
+    background:#fff;border-bottom:1px solid var(--line);
+  }
+  .plan-bar button{
+    border:1px solid var(--line);background:#fff;border-radius:10px;
+    color:var(--ink);width:38px;height:38px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;
+  }
+  .plan-bar button svg{width:19px;height:19px;}
+  .plan-title{
+    flex:1;min-width:0;font-family:'Archivo',sans-serif;font-weight:700;font-size:16px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .plan-pages{display:flex;align-items:center;gap:4px;flex-shrink:0;font-size:13px;font-weight:700;color:var(--ink-soft);}
+  .plan-pages[hidden]{display:none;}
+  .plan-pages button{width:34px;height:34px;font-size:20px;line-height:1;color:var(--ink-soft);}
+  .plan-stage{flex:1;position:relative;overflow:hidden;touch-action:none;}
+  .plan-canvas-wrap{position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform;}
+  .plan-canvas-wrap canvas{display:block;background:#fff;box-shadow:0 2px 12px rgba(30,58,58,.14);}
+  .plan-empty{
+    position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:30px 26px;color:var(--ink-soft);gap:4px;
+  }
+  .plan-empty[hidden]{display:none;}
+  .plan-empty svg{width:56px;height:56px;color:var(--blue);opacity:.8;margin-bottom:10px;}
+  .plan-empty h3{font-size:18px;color:var(--ink);}
+  .plan-empty p{font-size:14.5px;line-height:1.5;max-width:320px;margin:4px 0 16px;}
+  .plan-attach{
+    border:none;border-radius:12px;background:var(--blue);color:#fff;
+    font-family:'Archivo',sans-serif;font-weight:700;font-size:15.5px;
+    padding:14px 22px;cursor:pointer;box-shadow:0 4px 14px rgba(94,198,216,.4);
+  }
+  .plan-loading{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:var(--ink-soft);font-weight:600;font-size:15px;
+  }
+  .plan-loading[hidden]{display:none;}
+  .plan-zoom{
+    position:absolute;left:50%;transform:translateX(-50%);
+    bottom:calc(env(safe-area-inset-bottom) + 16px);
+    display:flex;gap:6px;background:#fff;border:1px solid var(--line);
+    border-radius:99px;padding:5px;box-shadow:0 4px 16px rgba(30,58,58,.14);
+  }
+  .plan-zoom button{
+    border:none;background:transparent;color:var(--ink);
+    font-family:inherit;font-size:17px;font-weight:700;
+    min-width:52px;height:40px;border-radius:99px;cursor:pointer;
+  }
+  .plan-zoom button:active{background:var(--blue-soft);}
+  #plan-fit{font-size:14px;}
 </style>
 </head>
 <body>
@@ -306,6 +409,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>
     </div>
     <h1>Site Progress</h1>
+    <button id="plan-btn" aria-label="Site layout plan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14"/><path d="M15 6v14"/></svg>
+      Plan
+    </button>
   </div>
   <div class="overall-row">
     <div class="overall-bar-wrap">
@@ -329,11 +436,47 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- Site plan viewer -->
+<div class="plan-overlay" id="plan-overlay" hidden>
+  <div class="plan-bar">
+    <button class="plan-close" id="plan-close" aria-label="Close plan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <span class="plan-title" id="plan-title">Site plan</span>
+    <div class="plan-pages" id="plan-pages" hidden>
+      <button id="plan-prev" aria-label="Previous page">‹</button>
+      <span id="plan-pageno">1/1</span>
+      <button id="plan-next" aria-label="Next page">›</button>
+    </div>
+    <button class="plan-menu" id="plan-replace" aria-label="Replace or remove plan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+    </button>
+  </div>
+
+  <div class="plan-stage" id="plan-stage">
+    <div class="plan-canvas-wrap" id="plan-wrap"><canvas id="plan-canvas"></canvas></div>
+    <div class="plan-empty" id="plan-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14"/><path d="M15 6v14"/></svg>
+      <h3>No site plan attached</h3>
+      <p>Attach the site layout plan PDF once and it stays on this phone — open it any time to check plot numbers.</p>
+      <button class="plan-attach" id="plan-attach">Attach site plan PDF</button>
+    </div>
+    <div class="plan-loading" id="plan-loading" hidden>Loading plan…</div>
+  </div>
+
+  <div class="plan-zoom">
+    <button id="plan-out" aria-label="Zoom out">−</button>
+    <button id="plan-fit" aria-label="Fit to screen">Fit</button>
+    <button id="plan-in" aria-label="Zoom in">+</button>
+  </div>
+</div>
+<input type="file" id="plan-file" accept="application/pdf,.pdf" hidden />
+
 <script>
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 12 · 11 Aug";
+const BUILD = "build 13 · 12 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -348,6 +491,7 @@ const ICON = {
   clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   medal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3l4 6 4-6"/><circle cx="12" cy="15" r="6"/><path d="M12 13v4M10 15h4"/></svg>',
   undo:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l-4-4 4-4"/><path d="M5 10h10a4 4 0 010 8h-3"/></svg>',
+  cal:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
 };
 
 /* ============================================================
@@ -386,7 +530,7 @@ function buildSeed(){
       id: uid(),
       name: "Plot " + n,
       open: false,
-      tasks: preset.map(t => ({ id: uid(), name: t, done: false, doneAt: null, note: "", noteOpen: false }))
+      tasks: preset.map(t => ({ id: uid(), name: t, done: false, doneAt: null, due: null, note: "", noteOpen: false }))
     }))
   }));
 }
@@ -396,7 +540,7 @@ function buildSeed(){
 function tasksFromStage(stage){
   let names = (stage.preset && stage.preset.length) ? stage.preset.slice() : [];
   if(!names.length && stage.plots[0]) names = stage.plots[0].tasks.map(t => t.name);
-  return names.map(n => ({ id: uid(), name: n, done: false, doneAt: null, note: "", noteOpen: false }));
+  return names.map(n => ({ id: uid(), name: n, done: false, doneAt: null, due: null, note: "", noteOpen: false }));
 }
 
 /* ============================================================
@@ -409,7 +553,7 @@ const RESTORE_FLAG = "siteProgress.restoredMissing.v1";
 let state = load();
 let timeline = loadJSON(TIMELINE_KEY, {});
 let completed = loadJSON(COMPLETED_KEY, []);
-let completedOpen = false, logsOpen = false;
+let completedOpen = false, logsOpen = false, dueOpen = false;
 const logsExpanded = new Set();
 
 function loadJSON(key, dflt){
@@ -442,7 +586,7 @@ function restoreMissingStages(stages){
       id: uid(), name, open: false, preset: preset.slice(),
       plots: [1, 2].map(n => ({
         id: uid(), name: "Plot " + n, open: false,
-        tasks: preset.map(t => ({ id: uid(), name: t, done: false, doneAt: null, note: "", noteOpen: false }))
+        tasks: preset.map(t => ({ id: uid(), name: t, done: false, doneAt: null, due: null, note: "", noteOpen: false }))
       }))
     };
     let insertAt = 0;
@@ -472,7 +616,7 @@ function migrate(stages){
       s.preset = PRESETS[s.name].slice();
       s.plots.forEach(p => {
         if(!p.tasks || !p.tasks.length){
-          p.tasks = s.preset.map(n => ({ id: uid(), name: n, done: false, doneAt: null, note: "", noteOpen: false }));
+          p.tasks = s.preset.map(n => ({ id: uid(), name: n, done: false, doneAt: null, due: null, note: "", noteOpen: false }));
         }
       });
     }
@@ -496,6 +640,7 @@ function normalize(stages){
         name: t.name || "",
         done: !!t.done,
         doneAt: (typeof t.doneAt === "number") ? t.doneAt : null,
+        due: t.due || null,
         note: t.note || "",
         noteOpen: !!t.noteOpen
       }))
@@ -551,6 +696,115 @@ function restorePlot(name){
   finals.open = true;
 }
 
+/* ============================================================
+   Due dates — what a trade promised when you asked them on site
+   ============================================================ */
+function dateStr(d){
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function todayStr(){ return dateStr(new Date()); }
+
+/* null = no date | "soon" | "today" | "over" | "met" | "late" */
+function dueState(task){
+  if(!task.due) return null;
+  if(task.done){
+    const on = task.doneAt ? dateStr(new Date(task.doneAt)) : null;
+    return (on && on > task.due) ? "late" : "met";
+  }
+  const t = todayStr();
+  if(task.due < t) return "over";
+  if(task.due === t) return "today";
+  return "soon";
+}
+function daysBetween(a, b){  /* whole days between two YYYY-MM-DD strings */
+  return Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
+}
+function fmtDay(s){
+  try{
+    const d = new Date(s + "T00:00:00");
+    return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  }catch(e){ return s; }
+}
+function dueLabel(task){
+  const st = dueState(task);
+  if(st === "today") return "Due today";
+  if(st === "over"){
+    const n = daysBetween(task.due, todayStr());
+    return n === 1 ? "1 day over" : n + " days over";
+  }
+  if(st === "met") return "On time";
+  if(st === "late"){
+    const on = dateStr(new Date(task.doneAt));
+    const n = daysBetween(task.due, on);
+    return n === 1 ? "1 day late" : n + " days late";
+  }
+  return "Due " + fmtDay(task.due);
+}
+function dueChip(task){
+  const st = dueState(task);
+  const chip = document.createElement("span");
+  chip.className = "due-chip" + (st && st !== "soon" ? " " + st : "");
+  const txt = document.createElement("span");
+  txt.textContent = dueLabel(task) + (st === "today" || st === "over" ? "" : st === "met" || st === "late" ? "  ·  " + fmtDay(task.due) : "");
+  chip.appendChild(txt);
+  const clear = document.createElement("button");
+  clear.textContent = "×";
+  clear.setAttribute("aria-label", "Clear date");
+  clear.onclick = e => { e.stopPropagation(); task.due = null; saveNow(); render(); };
+  chip.appendChild(clear);
+  return chip;
+}
+
+/* Every outstanding promise across the whole site, soonest first */
+function outstandingDue(){
+  const out = [];
+  state.forEach(stage => stage.plots.forEach(plot => plot.tasks.forEach(task => {
+    if(task.due && !task.done) out.push({ stage, plot, task });
+  })));
+  out.sort((a, b) => a.task.due < b.task.due ? -1 : a.task.due > b.task.due ? 1 : 0);
+  return out;
+}
+
+function renderDueSection(){
+  const rows = outstandingDue();
+  const overdue = rows.filter(r => dueState(r.task) === "over").length;
+  const el = document.createElement("div");
+  el.className = "stage summary due-summary" + (dueOpen ? " open" : "");
+  const head = summaryHead("Due Dates", ICON.cal, rows.length, dueOpen,
+    () => { dueOpen = !dueOpen; save(); el.classList.toggle("open", dueOpen); });
+  if(overdue){
+    const chip = head.querySelector(".chip");
+    chip.classList.add("alert");
+    chip.textContent = rows.length + " · " + overdue + " over";
+  }
+  el.appendChild(head);
+
+  const body = document.createElement("div");
+  body.className = "stage-body";
+  if(!rows.length){
+    body.appendChild(emptyNote("No dates set. When a trade tells you they'll be finished, tap the calendar on that task and it shows up here."));
+  } else {
+    rows.forEach(({ stage, plot, task }) => {
+      const row = document.createElement("div");
+      row.className = "due-row";
+      const info = document.createElement("div");
+      info.className = "due-info";
+      const t = document.createElement("div");
+      t.className = "due-task";
+      t.textContent = task.name || "(unnamed task)";
+      const w = document.createElement("div");
+      w.className = "due-where";
+      w.textContent = plot.name + "  ·  " + stage.name;
+      info.appendChild(t); info.appendChild(w);
+      row.appendChild(info);
+      row.appendChild(dueChip(task));
+      body.appendChild(row);
+    });
+  }
+  el.appendChild(body);
+  return el;
+}
+
 /* Human-friendly duration, tuned for site work (days, then hours, then minutes) */
 function fmtDur(ms){
   if(ms == null) return "";
@@ -589,6 +843,7 @@ const app = document.getElementById("app");
 
 function render(){
   app.innerHTML = "";
+  app.appendChild(renderDueSection());
   state.forEach(stage => app.appendChild(renderStage(stage)));
 
   const addStage = document.createElement("button");
@@ -902,7 +1157,7 @@ function renderPlot(stage, plot){
   addTask.className = "add-btn add-task-btn";
   addTask.innerHTML = ICON.plus + " Add task";
   addTask.onclick = () => {
-    plot.tasks.push({ id: uid(), name: "", done:false, doneAt:null, note:"", noteOpen:true });
+    plot.tasks.push({ id: uid(), name: "", done:false, doneAt:null, due:null, note:"", noteOpen:true });
     save(); render();
   };
   body.appendChild(addTask);
@@ -1030,6 +1285,10 @@ function renderTask(stage, plot, task){
   nameInput.oninput = () => { task.name = nameInput.value; save(); };
   main.appendChild(nameInput);
 
+  /* due-date chip (only shown once a date has been set) */
+  const dueWrap = document.createElement("div");
+  main.appendChild(dueWrap);
+
   const noteArea = document.createElement("div");
   noteArea.className = "note-area" + (task.noteOpen ? " show" : "");
   const ta = document.createElement("textarea");
@@ -1059,6 +1318,28 @@ function renderTask(stage, plot, task){
     if(task.noteOpen) ta.focus();
   };
 
+  /* due date — a native date picker hidden over a calendar button */
+  const dueBtn = document.createElement("label");
+  dueBtn.innerHTML = ICON.cal;
+  dueBtn.setAttribute("aria-label","Set date trade will finish");
+  const dueInput = document.createElement("input");
+  dueInput.type = "date";
+  dueInput.value = task.due || "";
+  dueInput.setAttribute("aria-label","Finish date");
+  dueInput.onchange = () => {
+    task.due = dueInput.value || null;
+    saveNow(); render();
+  };
+  dueBtn.appendChild(dueInput);
+
+  function paintDue(){
+    const st = dueState(task);
+    dueBtn.className = "icon-btn due-btn" + (st === "over" ? " due-over" : st === "today" ? " due-today" : st ? " due-set" : "");
+    dueWrap.innerHTML = "";
+    if(task.due) dueWrap.appendChild(dueChip(task));
+  }
+  paintDue();
+
   const delBtn = document.createElement("button");
   delBtn.className = "icon-btn del";
   delBtn.innerHTML = ICON.trash;
@@ -1069,6 +1350,7 @@ function renderTask(stage, plot, task){
   };
 
   actions.appendChild(noteBtn);
+  actions.appendChild(dueBtn);
   actions.appendChild(delBtn);
 
   el.appendChild(tick);
@@ -1201,6 +1483,19 @@ function exportPDF(){
         doc.text(nameLines, nameX, y);
         y += 14 * nameLines.length;
 
+        if(task.due){
+          newPageIfNeeded(13);
+          const st = dueState(task);
+          doc.setFont("helvetica","normal");
+          doc.setFontSize(9.5);
+          if(st === "over" || st === "late") doc.setTextColor(194,83,83);
+          else if(st === "today") doc.setTextColor(169,118,26);
+          else if(st === "met") doc.setTextColor(51,168,125);
+          else doc.setTextColor(58,168,188);
+          doc.text("Due " + fmtDay(task.due) + "  (" + dueLabel(task) + ")", nameX + 12, y);
+          y += 12.5;
+        }
+
         const note = (task.note || "").trim();
         if(note){
           doc.setFont("helvetica","italic");
@@ -1225,6 +1520,228 @@ function exportPDF(){
 }
 
 /* ============================================================
+   Site layout plan — a PDF kept on this device (IndexedDB, so a
+   multi-megabyte drawing is fine) and rendered with PDF.js
+   ============================================================ */
+const DB_NAME = "siteProgressFiles", DB_STORE = "files", PLAN_KEY = "siteplan";
+
+function idbOpen(){
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = () => { if(!r.result.objectStoreNames.contains(DB_STORE)) r.result.createObjectStore(DB_STORE); };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+function idbTx(mode, fn){
+  return idbOpen().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(DB_STORE, mode);
+    const rq = fn(tx.objectStore(DB_STORE));
+    tx.oncomplete = () => res(rq && rq.result);
+    tx.onerror = () => rej(tx.error);
+    tx.onabort = () => rej(tx.error);
+  }));
+}
+const planSave = rec => idbTx("readwrite", s => s.put(rec, PLAN_KEY));
+const planLoad = ()  => idbTx("readonly",  s => s.get(PLAN_KEY));
+const planDrop = ()  => idbTx("readwrite", s => s.delete(PLAN_KEY));
+
+const planEls = {};
+let planDoc = null, planPage = 1, planScale = 1, planFitScale = 1, planTx = 0, planTy = 0;
+
+function planBind(){
+  ["overlay","close","title","pages","prev","next","pageno","replace","stage","wrap","canvas","empty","loading","attach","file","out","fit","in"]
+    .forEach(k => planEls[k] = document.getElementById("plan-" + k));
+
+  planEls.overlay && (planEls.close.onclick = closePlan);
+  document.getElementById("plan-btn").onclick = openPlan;
+  planEls.attach.onclick = () => planEls.file.click();
+  planEls.file.onchange = onPlanFile;
+  planEls.replace.onclick = planMenu;
+  planEls.prev.onclick = () => gotoPlanPage(planPage - 1);
+  planEls.next.onclick = () => gotoPlanPage(planPage + 1);
+  planEls.in.onclick  = () => zoomPlan(1.4);
+  planEls.out.onclick = () => zoomPlan(1 / 1.4);
+  planEls.fit.onclick = () => { planScale = planFitScale; centrePlan(); applyPlanTransform(); };
+  attachPlanGestures();
+}
+
+function openPlan(){
+  planEls.overlay.hidden = false;
+  document.body.style.overflow = "hidden";
+  if(!planDoc) loadPlanFromStore();
+}
+function closePlan(){
+  planEls.overlay.hidden = true;
+  document.body.style.overflow = "";
+}
+
+function planMenu(){
+  if(!planDoc){ planEls.file.click(); return; }
+  if(confirm("Replace the site plan with a different PDF?\n\nTap Cancel to keep it, then use Remove below if you want it gone.")){
+    planEls.file.click();
+  } else if(confirm("Remove the current site plan?")){
+    planDrop().then(() => { planDoc = null; showPlanEmpty(); showToast("Site plan removed"); });
+  }
+}
+
+function onPlanFile(e){
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if(!f) return;
+  if(!/pdf/i.test(f.type) && !/\.pdf$/i.test(f.name)){ showToast("Please choose a PDF"); return; }
+  planEls.empty.hidden = true;
+  planEls.loading.hidden = false;
+  f.arrayBuffer()
+    .then(buf => planSave({ name: f.name, buf }).then(() => renderPlanFrom(buf, f.name)))
+    .then(() => showToast("Site plan saved to this phone"))
+    .catch(err => { console.warn(err); planEls.loading.hidden = true; showToast("Could not save that PDF"); });
+}
+
+function loadPlanFromStore(){
+  planEls.loading.hidden = false;
+  planEls.empty.hidden = true;
+  planLoad()
+    .then(rec => {
+      if(!rec || !rec.buf){ showPlanEmpty(); return; }
+      return renderPlanFrom(rec.buf, rec.name);
+    })
+    .catch(err => { console.warn(err); showPlanEmpty(); });
+}
+
+function showPlanEmpty(){
+  planEls.loading.hidden = true;
+  planEls.empty.hidden = false;
+  planEls.pages.hidden = true;
+  planEls.title.textContent = "Site plan";
+  planEls.canvas.width = planEls.canvas.height = 0;
+}
+
+function renderPlanFrom(buf, name){
+  const lib = window.pdfjsLib;
+  if(!lib){ planEls.loading.hidden = true; showToast("PDF viewer not loaded — check connection"); return Promise.resolve(); }
+  lib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  /* pdf.js takes ownership of the buffer, so hand it a copy */
+  return lib.getDocument({ data: buf.slice(0) }).promise.then(doc => {
+    planDoc = doc;
+    planPage = 1;
+    planEls.title.textContent = name || "Site plan";
+    planEls.empty.hidden = true;
+    planEls.pages.hidden = doc.numPages < 2;
+    return drawPlanPage();
+  }).catch(err => {
+    console.warn(err);
+    planEls.loading.hidden = true;
+    showToast("Could not open that PDF");
+  });
+}
+
+function gotoPlanPage(n){
+  if(!planDoc) return;
+  if(n < 1 || n > planDoc.numPages) return;
+  planPage = n;
+  drawPlanPage();
+}
+
+/* Render at a generous resolution so plot numbers stay readable when zoomed */
+function drawPlanPage(){
+  planEls.loading.hidden = false;
+  return planDoc.getPage(planPage).then(page => {
+    const stageW = planEls.stage.clientWidth || 360;
+    const stageH = planEls.stage.clientHeight || 600;
+    const base = page.getViewport({ scale: 1 });
+    const fit = Math.min(stageW / base.width, stageH / base.height);
+    const render = Math.min(fit * 4, 6);           /* cap so huge drawings stay in memory */
+    const vp = page.getViewport({ scale: render });
+    const canvas = planEls.canvas;
+    canvas.width = Math.round(vp.width);
+    canvas.height = Math.round(vp.height);
+    canvas.style.width = canvas.width + "px";
+    canvas.style.height = canvas.height + "px";
+    return page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise.then(() => {
+      planFitScale = fit / render;                 /* CSS scale that fits the screen */
+      planScale = planFitScale;
+      centrePlan();
+      applyPlanTransform();
+      planEls.loading.hidden = true;
+      planEls.pageno.textContent = planPage + "/" + planDoc.numPages;
+    });
+  });
+}
+
+function centrePlan(){
+  const c = planEls.canvas;
+  planTx = (planEls.stage.clientWidth  - c.width  * planScale) / 2;
+  planTy = (planEls.stage.clientHeight - c.height * planScale) / 2;
+  if(planTy < 0) planTy = 0;
+}
+function applyPlanTransform(){
+  planEls.wrap.style.transform = "translate(" + planTx + "px," + planTy + "px) scale(" + planScale + ")";
+}
+function zoomPlan(factor, cx, cy){
+  if(!planDoc) return;
+  const sx = cx == null ? planEls.stage.clientWidth / 2 : cx;
+  const sy = cy == null ? planEls.stage.clientHeight / 2 : cy;
+  const next = Math.max(planFitScale * 0.6, Math.min(planScale * factor, planFitScale * 14));
+  const k = next / planScale;
+  planTx = sx - (sx - planTx) * k;
+  planTy = sy - (sy - planTy) * k;
+  planScale = next;
+  applyPlanTransform();
+}
+
+/* One finger pans, two fingers pinch-zoom, double-tap toggles fit/close-up */
+function attachPlanGestures(){
+  const stage = planEls.stage;
+  const pts = new Map();
+  let last = null, lastTap = 0;
+
+  stage.addEventListener("pointerdown", e => {
+    if(!planDoc) return;
+    stage.setPointerCapture(e.pointerId);
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    last = null;
+    if(pts.size === 1){
+      const now = Date.now();
+      if(now - lastTap < 300){
+        zoomPlan(planScale > planFitScale * 1.5 ? planFitScale / planScale : 2.5, e.clientX, e.clientY);
+      }
+      lastTap = now;
+    }
+  });
+
+  stage.addEventListener("pointermove", e => {
+    if(!pts.has(e.pointerId)) return;
+    const prev = pts.get(e.pointerId);
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if(pts.size === 1){
+      planTx += e.clientX - prev.x;
+      planTy += e.clientY - prev.y;
+      applyPlanTransform();
+    } else if(pts.size === 2){
+      const [a, b] = [...pts.values()];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      if(last){
+        if(last.dist > 0) zoomPlan(dist / last.dist, mid.x, mid.y);
+        planTx += mid.x - last.mid.x;
+        planTy += mid.y - last.mid.y;
+        applyPlanTransform();
+      }
+      last = { dist, mid };
+    }
+  });
+
+  const up = e => {
+    pts.delete(e.pointerId);
+    if(pts.size < 2) last = null;
+  };
+  stage.addEventListener("pointerup", up);
+  stage.addEventListener("pointercancel", up);
+}
+
+/* ============================================================
    Toast
    ============================================================ */
 let toastTimer = null;
@@ -1244,6 +1761,7 @@ document.getElementById("export-btn").addEventListener("click", exportPDF);
 /* Persist just before the app is backgrounded/closed (belt & braces on top of debounced save) */
 window.addEventListener("pagehide", saveNow);
 
+planBind();
 render();
 </script>
 </body>
