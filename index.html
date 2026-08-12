@@ -367,7 +367,7 @@
   .plan-pages button{width:34px;height:34px;font-size:20px;line-height:1;color:var(--ink-soft);}
   .plan-stage{flex:1;position:relative;overflow:hidden;touch-action:none;}
   .plan-canvas-wrap{position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform;}
-  .plan-canvas-wrap canvas{display:block;background:#fff;box-shadow:0 2px 12px rgba(30,58,58,.14);}
+  .plan-canvas-wrap canvas{display:block;}
   .plan-empty{
     position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
     text-align:center;padding:30px 26px;color:var(--ink-soft);gap:4px;
@@ -476,7 +476,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 13 · 12 Aug";
+const BUILD = "build 14 · 12 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -1547,7 +1547,14 @@ const planLoad = ()  => idbTx("readonly",  s => s.get(PLAN_KEY));
 const planDrop = ()  => idbTx("readwrite", s => s.delete(PLAN_KEY));
 
 const planEls = {};
-let planDoc = null, planPage = 1, planScale = 1, planFitScale = 1, planTx = 0, planTy = 0;
+let planDoc = null, planPage = 1;
+/* Current view: scale = PDF units -> CSS px, tx/ty = page origin on screen */
+let planScale = 1, planFitScale = 1, planTx = 0, planTy = 0;
+/* What the canvas bitmap currently holds, so it can be transformed until the next sharp render */
+let rScale = 1, rTx = 0, rTy = 0, rMx = 0, rMy = 0;
+let planPageObj = null, planBase = null, planRenderTask = null, planRerenderTimer = null;
+const PLAN_MARGIN = 1.5;      /* render half a screen beyond the edges so small pans stay covered */
+const PLAN_PIXEL_BUDGET = 8e6;
 
 function planBind(){
   ["overlay","close","title","pages","prev","next","pageno","replace","stage","wrap","canvas","empty","loading","attach","file","out","fit","in"]
@@ -1598,15 +1605,18 @@ function onPlanFile(e){
     .catch(err => { console.warn(err); planEls.loading.hidden = true; showToast("Could not save that PDF"); });
 }
 
+let planLoadSeq = 0;
 function loadPlanFromStore(){
+  const seq = ++planLoadSeq;
   planEls.loading.hidden = false;
   planEls.empty.hidden = true;
   planLoad()
     .then(rec => {
+      if(seq !== planLoadSeq) return;          /* a newer attach/render won the race */
       if(!rec || !rec.buf){ showPlanEmpty(); return; }
       return renderPlanFrom(rec.buf, rec.name);
     })
-    .catch(err => { console.warn(err); showPlanEmpty(); });
+    .catch(err => { if(seq === planLoadSeq){ console.warn(err); showPlanEmpty(); } });
 }
 
 function showPlanEmpty(){
@@ -1618,6 +1628,7 @@ function showPlanEmpty(){
 }
 
 function renderPlanFrom(buf, name){
+  planLoadSeq++;                                /* this render supersedes any in-flight store load */
   const lib = window.pdfjsLib;
   if(!lib){ planEls.loading.hidden = true; showToast("PDF viewer not loaded — check connection"); return Promise.resolve(); }
   lib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
@@ -1643,51 +1654,104 @@ function gotoPlanPage(n){
   drawPlanPage();
 }
 
-/* Render at a generous resolution so plot numbers stay readable when zoomed */
 function drawPlanPage(){
   planEls.loading.hidden = false;
   return planDoc.getPage(planPage).then(page => {
-    const stageW = planEls.stage.clientWidth || 360;
-    const stageH = planEls.stage.clientHeight || 600;
-    const base = page.getViewport({ scale: 1 });
-    const fit = Math.min(stageW / base.width, stageH / base.height);
-    const render = Math.min(fit * 4, 6);           /* cap so huge drawings stay in memory */
-    const vp = page.getViewport({ scale: render });
-    const canvas = planEls.canvas;
-    canvas.width = Math.round(vp.width);
-    canvas.height = Math.round(vp.height);
-    canvas.style.width = canvas.width + "px";
-    canvas.style.height = canvas.height + "px";
-    return page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise.then(() => {
-      planFitScale = fit / render;                 /* CSS scale that fits the screen */
-      planScale = planFitScale;
-      centrePlan();
-      applyPlanTransform();
-      planEls.loading.hidden = true;
-      planEls.pageno.textContent = planPage + "/" + planDoc.numPages;
-    });
+    planPageObj = page;
+    planBase = page.getViewport({ scale: 1 });
+    const sw = planEls.stage.clientWidth || 360;
+    const sh = planEls.stage.clientHeight || 600;
+    planFitScale = Math.min(sw / planBase.width, sh / planBase.height);
+    planScale = planFitScale;
+    centrePlan();
+    return rerenderPlan();
   });
 }
 
 function centrePlan(){
-  const c = planEls.canvas;
-  planTx = (planEls.stage.clientWidth  - c.width  * planScale) / 2;
-  planTy = (planEls.stage.clientHeight - c.height * planScale) / 2;
+  planTx = (planEls.stage.clientWidth  - planBase.width  * planScale) / 2;
+  planTy = (planEls.stage.clientHeight - planBase.height * planScale) / 2;
   if(planTy < 0) planTy = 0;
 }
+
+/* The bitmap on screen was rendered for (rScale, rTx, rTy). Until the next sharp
+   render lands, stretch/shift it to match the live view so gestures stay smooth. */
 function applyPlanTransform(){
-  planEls.wrap.style.transform = "translate(" + planTx + "px," + planTy + "px) scale(" + planScale + ")";
+  const k = planScale / rScale;
+  const x = planTx - (rTx + rMx) * k;
+  const y = planTy - (rTy + rMy) * k;
+  planEls.wrap.style.transform = "translate(" + x + "px," + y + "px) scale(" + k + ")";
 }
+
+function scheduleRerender(){
+  clearTimeout(planRerenderTimer);
+  planRerenderTimer = setTimeout(rerenderPlan, 150);
+}
+
+/* Re-rasterise ONLY the region on screen, at the current zoom × screen pixel density.
+   Keeps the drawing genuinely sharp at any zoom without a huge canvas. */
+function rerenderPlan(){
+  if(!planPageObj || !planEls.stage.clientWidth) return Promise.resolve();
+  if(planRenderTask){ try{ planRenderTask.cancel(); }catch(e){} planRenderTask = null; }
+
+  const sw = planEls.stage.clientWidth, sh = planEls.stage.clientHeight;
+  const mx = sw * (PLAN_MARGIN - 1) / 2, my = sh * (PLAN_MARGIN - 1) / 2;
+  const cssW = sw + mx * 2, cssH = sh + my * 2;
+
+  let dpr = Math.min(window.devicePixelRatio || 1, 3);
+  if(cssW * dpr * cssH * dpr > PLAN_PIXEL_BUDGET){
+    dpr *= Math.sqrt(PLAN_PIXEL_BUDGET / (cssW * dpr * cssH * dpr));
+  }
+  const cw = Math.max(1, Math.round(cssW * dpr)), ch = Math.max(1, Math.round(cssH * dpr));
+
+  /* snapshot the view this render is for */
+  const sScale = planScale, sTx = planTx, sTy = planTy;
+  const Sd = sScale * dpr;
+  const e = (sTx + mx) * dpr, f = (sTy + my) * dpr;
+
+  /* draw offscreen, then swap in one go so there is no blank flash */
+  const off = document.createElement("canvas");
+  off.width = cw; off.height = ch;
+  const ctx = off.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(e, f, planBase.width * Sd, planBase.height * Sd);
+
+  const task = planPageObj.render({
+    canvasContext: ctx,
+    viewport: planPageObj.getViewport({ scale: Sd }),
+    transform: [1, 0, 0, 1, e, f]
+  });
+  planRenderTask = task;
+
+  return task.promise.then(() => {
+    planRenderTask = null;
+    const canvas = planEls.canvas;
+    canvas.width = cw; canvas.height = ch;
+    canvas.style.width = cssW + "px";
+    canvas.style.height = cssH + "px";
+    canvas.getContext("2d").drawImage(off, 0, 0);
+    rScale = sScale; rTx = sTx; rTy = sTy; rMx = mx; rMy = my;
+    applyPlanTransform();
+    planEls.loading.hidden = true;
+    if(planDoc) planEls.pageno.textContent = planPage + "/" + planDoc.numPages;
+  }).catch(err => {
+    if(err && (err.name === "RenderingCancelledException" || /cancel/i.test(err.message || ""))) return;
+    console.warn(err);
+    planEls.loading.hidden = true;
+  });
+}
+
 function zoomPlan(factor, cx, cy){
   if(!planDoc) return;
   const sx = cx == null ? planEls.stage.clientWidth / 2 : cx;
   const sy = cy == null ? planEls.stage.clientHeight / 2 : cy;
-  const next = Math.max(planFitScale * 0.6, Math.min(planScale * factor, planFitScale * 14));
+  const next = Math.max(planFitScale * 0.6, Math.min(planScale * factor, planFitScale * 30));
   const k = next / planScale;
   planTx = sx - (sx - planTx) * k;
   planTy = sy - (sy - planTy) * k;
   planScale = next;
   applyPlanTransform();
+  scheduleRerender();
 }
 
 /* One finger pans, two fingers pinch-zoom, double-tap toggles fit/close-up */
@@ -1736,9 +1800,21 @@ function attachPlanGestures(){
   const up = e => {
     pts.delete(e.pointerId);
     if(pts.size < 2) last = null;
+    if(pts.size === 0 && planDoc) scheduleRerender();   /* sharpen once the gesture ends */
   };
   stage.addEventListener("pointerup", up);
   stage.addEventListener("pointercancel", up);
+
+  /* rotate the phone / resize: refit and redraw */
+  window.addEventListener("resize", () => {
+    if(planEls.overlay.hidden || !planPageObj) return;
+    clearTimeout(planRerenderTimer);
+    planRerenderTimer = setTimeout(() => {
+      const sw = planEls.stage.clientWidth, sh = planEls.stage.clientHeight;
+      planFitScale = Math.min(sw / planBase.width, sh / planBase.height);
+      rerenderPlan();
+    }, 200);
+  });
 }
 
 /* ============================================================
