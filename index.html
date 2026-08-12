@@ -144,9 +144,13 @@
   .plot-swipe-action svg{width:20px;height:20px;flex-shrink:0;}
   .plot-head{
     position:relative;background:#FCFEFD;
-    display:flex;align-items:center;gap:8px;
+    display:flex;align-items:center;gap:8px;row-gap:7px;flex-wrap:wrap;
     padding:11px 12px;cursor:pointer;
     touch-action:pan-y;will-change:transform;
+  }
+  .plot-chips{
+    flex-basis:100%;display:flex;gap:6px;flex-wrap:wrap;
+    padding-left:26px;
   }
   .plot-head .chev{width:18px;height:18px;}
   .plot-name{
@@ -487,7 +491,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 17 · 12 Aug";
+const BUILD = "build 18 · 12 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -1497,8 +1501,14 @@ function renderPlot(stage, plot){
   frac.textContent = done + "/" + total;
 
   head.appendChild(nameInput);
-  progChips(plot, si).forEach(c => head.appendChild(c));   /* ahead + claim chips */
   head.appendChild(frac);
+  const chips = progChips(plot, si);                 /* ahead + claim chips on their own line */
+  if(chips.length){
+    const cw = document.createElement("div");
+    cw.className = "plot-chips";
+    chips.forEach(c => cw.appendChild(c));
+    head.appendChild(cw);
+  }
   head.onclick = () => {
     if(head.__swiped) return;              /* was a horizontal swipe — ignore the tap */
     plot.open = !plot.open; save(); el.classList.toggle("open", plot.open);
