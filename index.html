@@ -491,7 +491,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 18 · 12 Aug";
+const BUILD = "build 19 · 12 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -1780,7 +1780,11 @@ function exportPDF(){
   doc.line(marginX, y, pageW - marginX, y);
   y += 22;
 
-  state.forEach(stage => {
+  state.forEach((stage, si) => {
+    /* only plots with at least one ticked task make the report */
+    const active = stage.plots.filter(p => plotCounts(p).done > 0);
+    if(!active.length) return;
+
     const sc = stageCounts(stage);
     const sp = pct(sc.done, sc.total);
 
@@ -1795,16 +1799,9 @@ function exportPDF(){
     doc.text(sp + "%  (" + sc.done + "/" + sc.total + ")", pageW - marginX, y, { align:"right" });
     y += 16;
 
-    if(stage.plots.length === 0){
-      doc.setFontSize(10);
-      doc.setTextColor(150,165,165);
-      doc.text("— no plots —", marginX + 12, y);
-      y += 16;
-    }
-
-    stage.plots.forEach(plot => {
+    active.forEach(plot => {
       const pc = plotCounts(plot);
-      newPageIfNeeded(22);
+      newPageIfNeeded(30);
       doc.setFont("helvetica","bold");
       doc.setFontSize(11.5);
       doc.setTextColor(30,58,58);
@@ -1813,14 +1810,34 @@ function exportPDF(){
       doc.setFontSize(9.5);
       doc.setTextColor(120,140,140);
       doc.text(pc.done + "/" + pc.total, pageW - marginX, y, { align:"right" });
-      y += 15;
 
-      if(plot.tasks.length === 0){
-        doc.setFontSize(9.5);
-        doc.setTextColor(160,175,175);
-        doc.text("(no tasks)", marginX + 26, y);
-        y += 14;
+      /* programme status: days ahead + claim-by date for this stage */
+      if(plot.prog){
+        const bits = [];
+        const ahead = daysAhead(plot, si);
+        if(ahead > 0) bits.push({ t: ahead + "d ahead of programme", c: [51,168,125] });
+        const due = plot.prog.est && plot.prog.est[String(si + 1)];
+        if(due){
+          const ci = claimInfo(due);
+          bits.push({
+            t: ci.st === "over" ? "claim was due " + fmtDay(ci.claim) + " (" + (-ci.days) + "d over)"
+                                : "claim by " + fmtDay(ci.claim) + (ci.st === "today" ? " (today)" : " (" + ci.days + "d)"),
+            c: ci.st === "over" ? [194,83,83] : ci.st === "near" || ci.st === "today" ? [169,118,26] : [58,168,188]
+          });
+        }
+        if(bits.length){
+          y += 12;
+          doc.setFontSize(9);
+          let bx = marginX + 12;
+          bits.forEach((b, bi) => {
+            doc.setTextColor(b.c[0], b.c[1], b.c[2]);
+            const txt = (bi ? "  ·  " : "") + b.t;
+            doc.text(txt, bx, y);
+            bx += doc.getTextWidth(txt);
+          });
+        }
       }
+      y += 15;
 
       plot.tasks.forEach(task => {
         newPageIfNeeded(16);
