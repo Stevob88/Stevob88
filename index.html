@@ -487,7 +487,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 15 · 12 Aug";
+const BUILD = "build 16 · 12 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -948,8 +948,16 @@ function claimInfo(due){
   d.setDate(d.getDate() - 2);
   const claim = dateStr(d);
   const t = todayStr();
-  const st = claim < t ? "over" : (daysBetween(t, claim) <= 7 ? "near" : "future");
-  return { claim: claim, st: st };
+  const days = daysBetween(t, claim);              /* +ve = days to go, -ve = days past */
+  const st = days < 0 ? "over" : (days === 0 ? "today" : (days <= 7 ? "near" : "future"));
+  return { claim: claim, st: st, days: days };
+}
+
+/* Chip wording incl. countdown: "claim Fri, Aug 28 · 16d" / "claim today" / "was Fri, Aug 14 · 3d over" */
+function claimLabel(ci){
+  if(ci.st === "today") return "claim today";
+  if(ci.st === "over")  return "was " + fmtDay(ci.claim) + " · " + (-ci.days) + "d over";
+  return "claim " + fmtDay(ci.claim) + " · " + ci.days + "d";
 }
 
 function progChip(plot, stageIdx){
@@ -966,8 +974,8 @@ function progChip(plot, stageIdx){
   }
   const ci = claimInfo(due);
   const chip = document.createElement("span");
-  chip.className = "due-chip" + (ci.st === "over" ? " over" : ci.st === "near" ? " today" : "");
-  chip.textContent = (ci.st === "over" ? "was " : "claim ") + fmtDay(ci.claim);
+  chip.className = "due-chip" + (ci.st === "over" ? " over" : (ci.st === "near" || ci.st === "today") ? " today" : "");
+  chip.textContent = claimLabel(ci);
   return chip;
 }
 
@@ -1108,8 +1116,8 @@ function renderProgSection(){
       w.textContent = "S" + (r.si + 1) + " · " + r.stage.name;
       info2.appendChild(t); info2.appendChild(w);
       const chip = document.createElement("span");
-      chip.className = "due-chip" + (r.ci.st === "over" ? " over" : r.ci.st === "near" ? " today" : "");
-      chip.textContent = (r.ci.st === "over" ? "was " : "claim ") + fmtDay(r.ci.claim);
+      chip.className = "due-chip" + (r.ci.st === "over" ? " over" : (r.ci.st === "near" || r.ci.st === "today") ? " today" : "");
+      chip.textContent = claimLabel(r.ci);
       row.appendChild(info2); row.appendChild(chip);
       row.onclick = () => {
         r.stage.open = true; r.p.open = true; save(); render();
