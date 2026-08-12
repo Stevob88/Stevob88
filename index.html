@@ -491,7 +491,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 22 · 13 Aug";
+const BUILD = "build 23 · 13 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -520,15 +520,15 @@ const ICON = {
    duplicates allowed, and swipes skip over it). */
 const SEED = [
   ["Foundations",        ["Groundworker","Steel","NHBC Foundations","Concrete"]],
-  ["Substructure",       ["Blockwork","drainage","NHBC Drainage","Block and Beam","Insulation","Pour Slab","Soleplate","Splash","Scaff Matt"]],
-  ["Superstructure",     ["Scaffold","Crane","Timberframe","Oregon Externals"]],
+  ["Substructure",       ["Blockwork","drainage","NHBC Drainage","Block and Beam","Insulation","Part L - 1a Perimeter","Part L - 1b Doorway","Pour Slab","Soleplate","Part L - 1c Therm Edge","Splash","Scaff Matt"]],
+  ["Superstructure",     ["Scaffold","Crane","Timberframe","Part L - 2a VCL Lap","Oregon Externals"]],
   ["Brickwork",          ["Brickwork 1st Lift","Fire photo","NHBC Super Inspection","Brickwork 2nd Lift","Scaffold Adaption","Brickwork Eaves + Gable","Window Detape","Down Pipes","Scaffold Dismantle"], true],
-  ["Roof",               ["Felt & Batten","Fire photo","Pv Panel","Roof tile"]],
-  ["1st Fix",            ["Joiner Prefix","Electrician Prefix","Plumber Prefix","VCL","Joiner 1st Fix","Plumber 1st Fix","Electrician 1st Fix","Party Wall","Windows","Joiner Dropbacks","Barratt","NHBC Preplaster"]],
+  ["Roof",               ["Felt & Batten","Fire photo","Pv Panel","Part L - 6a PV Panel","Roof tile"]],
+  ["1st Fix",            ["Joiner Prefix","Electrician Prefix","Plumber Prefix","VCL","Joiner 1st Fix","Plumber 1st Fix","Electrician 1st Fix","Party Wall","Windows","Joiner Dropbacks","Part L - 2b Joist Insulation","Part L - 3a Eaves Insulation","Part L - 4a Windows","Part L - 4b Doors","Part L - 6a WWHR","Barratt","NHBC Preplaster"]],
   ["Plasterboard",       ["Boarder","Taper","MF Ceiling"]],
   ["2nd Fix",            ["Mistcoat","Joiner 2nd fix","Plumber 2nd fix","Electrician 2nd fix","wall tiler","Kitchen","Patcher"]],
   ["Paint & Decoration", ["Painter"]],
-  ["Finals",             ["Build clean","Mastic","Joiner Final","Electrician Final","PV Commission","Plumber final","Flooring","Patcher final","Paint final","Appliances","Reclean","All Trade Snags","CML"]],
+  ["Finals",             ["Build clean","Part L - 3a Loft Insulation","Part L - 6a PV Invertor","Part L - 6a Boiler","Part L - 6c Fan Duct","Mastic","Joiner Final","Electrician Final","PV Commission","Plumber final","Flooring","Patcher final","Paint final","Appliances","Reclean","All Trade Snags","CML"]],
 ];
 /* Canonical order of the nine programme flow stages -> progNo 1..9 */
 const FLOW_NAMES = ["Foundations","Substructure","Superstructure","Roof","1st Fix","Plasterboard","2nd Fix","Paint & Decoration","Finals"];
@@ -725,6 +725,40 @@ function migrate(stages){
       addAfter(stages.find(s => s.basic && norm(s.name) === "brickwork"), "Brickwork 1st Lift");
       addAfter(stages.find(s => s.progNo === 4), "Felt & Batten");
       localStorage.setItem("siteProgress.firephoto.v1", "1");
+      localStorage.setItem(STORE_KEY, JSON.stringify(stages));
+    }
+  }catch(e){}
+
+  /* one-time: add the Part L evidence tasks across the presets */
+  try{
+    if(!localStorage.getItem("siteProgress.partl.v1")){
+      const norm = n => (n || "").trim().toLowerCase();
+      /* insert names sequentially after the anchor; skips any already present */
+      const seq = (list, anchor, names, isTask) => {
+        const nameOf = x => isTask ? x.name : x;
+        let at = list.findIndex(x => norm(nameOf(x)) === norm(anchor));
+        if(at < 0) at = list.length - 1;
+        names.forEach(nm => {
+          const existing = list.findIndex(x => norm(nameOf(x)) === norm(nm));
+          if(existing >= 0){ at = existing; return; }
+          const item = isTask ? { id: uid(), name: nm, done: false, doneAt: null, due: null, note: "", noteOpen: false } : nm;
+          list.splice(at + 1, 0, item);
+          at = at + 1;
+        });
+      };
+      const addToStage = (stage, anchor, names) => {
+        if(!stage) return;
+        if(Array.isArray(stage.preset)) seq(stage.preset, anchor, names, false);
+        stage.plots.forEach(p => seq(p.tasks, anchor, names, true));
+      };
+      const byNo = n => stages.find(s => s.progNo === n);
+      addToStage(byNo(2), "Insulation",       ["Part L - 1a Perimeter","Part L - 1b Doorway"]);
+      addToStage(byNo(2), "Soleplate",        ["Part L - 1c Therm Edge"]);
+      addToStage(byNo(3), "Timberframe",      ["Part L - 2a VCL Lap"]);
+      addToStage(byNo(5), "Joiner Dropbacks", ["Part L - 2b Joist Insulation","Part L - 3a Eaves Insulation","Part L - 4a Windows","Part L - 4b Doors","Part L - 6a WWHR"]);
+      addToStage(byNo(4), "Pv Panel",         ["Part L - 6a PV Panel"]);
+      addToStage(byNo(9), "Build clean",      ["Part L - 3a Loft Insulation","Part L - 6a PV Invertor","Part L - 6a Boiler","Part L - 6c Fan Duct"]);
+      localStorage.setItem("siteProgress.partl.v1", "1");
       localStorage.setItem(STORE_KEY, JSON.stringify(stages));
     }
   }catch(e){}
