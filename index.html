@@ -491,7 +491,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 20 · 13 Aug";
+const BUILD = "build 21 · 13 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -522,7 +522,7 @@ const SEED = [
   ["Foundations",        ["Groundworker","Steel","NHBC Foundations","Concrete"]],
   ["Substructure",       ["Blockwork","drainage","NHBC Drainage","Block and Beam","Insulation","Pour Slab","Soleplate","Splash","Scaff Matt"]],
   ["Superstructure",     ["Scaffold","Crane","Timberframe","Oregon Externals"]],
-  ["Brickwork",          ["Brickwork","NHBC Superstructure","Window Detape","Down Pipes","Scaffold Dismantle"], true],
+  ["Brickwork",          ["Brickwork 1st Lift","NHBC Super Inspection","Brickwork 2nd Lift","Scaffold Adaption","Brickwork Eaves + Gable","Window Detape","Down Pipes","Scaffold Dismantle"], true],
   ["Roof",               ["Felt & Batten","Pv Panel","Roof tile"]],
   ["1st Fix",            ["Joiner Prefix","Electrician Prefix","Plumber Prefix","VCL","Joiner 1st Fix","Plumber 1st Fix","Electrician 1st Fix","Party Wall","Windows","Joiner Dropbacks","Barratt","NHBC Preplaster"]],
   ["Plasterboard",       ["Boarder","Taper","MF Ceiling"]],
@@ -671,6 +671,36 @@ function migrate(stages){
         });
       }
       localStorage.setItem("siteProgress.brickwork.v1", "1");
+      localStorage.setItem(STORE_KEY, JSON.stringify(stages));
+    }
+  }catch(e){}
+
+  /* one-time: refresh the Brickwork preset to the detailed lift breakdown.
+     Existing plots keep every ticked/noted task; unticked old-preset tasks are
+     replaced by the new list (same-named tasks keep their state). */
+  try{
+    if(!localStorage.getItem("siteProgress.brickwork.v2")){
+      const bw = stages.find(s => s.basic && (s.name || "").trim().toLowerCase() === "brickwork");
+      if(bw){
+        const NEW = PRESETS["Brickwork"].slice();
+        const OLD = ["Brickwork","NHBC Superstructure","Window Detape","Down Pipes","Scaffold Dismantle"];
+        const norm = n => (n || "").trim().toLowerCase();
+        bw.preset = NEW.slice();
+        bw.plots.forEach(p => {
+          const rebuilt = NEW.map(n => {
+            const ex = p.tasks.find(t => norm(t.name) === norm(n));
+            return ex || { id: uid(), name: n, done: false, doneAt: null, due: null, note: "", noteOpen: false };
+          });
+          p.tasks.forEach(t => {
+            const inNew = NEW.some(n => norm(n) === norm(t.name));
+            const inOld = OLD.some(n => norm(n) === norm(t.name));
+            const keepable = t.done || (t.note || "").trim() || t.due;
+            if(!inNew && (keepable || !inOld)) rebuilt.push(t);   /* keep ticked/noted or custom tasks */
+          });
+          p.tasks = rebuilt;
+        });
+      }
+      localStorage.setItem("siteProgress.brickwork.v2", "1");
       localStorage.setItem(STORE_KEY, JSON.stringify(stages));
     }
   }catch(e){}
