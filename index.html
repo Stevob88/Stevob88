@@ -522,7 +522,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 29 · 14 Aug";
+const BUILD = "build 30 · 14 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -2153,12 +2153,11 @@ function exportPDF(){
   y += 22;
 
   state.forEach((stage, si) => {
-    /* only plots with at least one ticked task make the report — except the
-       last three flow stages (2nd Fix, Paint & Decoration, Finals), which
-       always show every plot */
+    /* every stage shows all its plots — except Foundations, which lists only
+       plots with at least one tick (keeps the not-yet-started backlog out) */
     if(stage.list) return;
-    const showAll = !stage.basic && stage.progNo >= 7 && stage.progNo <= 9;
-    const active = showAll ? stage.plots.slice() : stage.plots.filter(p => plotCounts(p).done > 0);
+    const onlyTicked = stage.progNo === 1;
+    const active = onlyTicked ? stage.plots.filter(p => plotCounts(p).done > 0) : stage.plots.slice();
     if(!active.length) return;
 
     const sc = stageCounts(stage);
