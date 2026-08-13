@@ -522,7 +522,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 30 · 14 Aug";
+const BUILD = "build 31 · 14 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -2117,151 +2117,161 @@ function exportPDF(){
   const { jsPDF } = window.jspdf || {};
   if(!jsPDF){ showToast("PDF library not loaded — check connection"); return; }
 
-  const doc = new jsPDF({ unit:"pt", format:"a4" });
+  /* Landscape claims matrix: one table per stage — plot numbers down the left
+     (with claim/ahead info beneath), the stage's preset tasks as columns, and
+     a tick in each completed cell. Mirrors the weekly programme layout. */
+  const doc = new jsPDF({ unit:"pt", format:"a4", orientation:"landscape" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const marginX = 40;
-  const marginBottom = 46;
-  let y = 52;
+  const marginX = 36;
+  const marginBottom = 40;
+  const PLOT_W = 118;
+  let y = 48;
 
   const today = new Date();
   const dateStr = today.toLocaleDateString(undefined, { year:"numeric", month:"long", day:"numeric" });
   const fileDate = today.getFullYear() + "-" + String(today.getMonth()+1).padStart(2,"0") + "-" + String(today.getDate()).padStart(2,"0");
   const { done, total } = overallCounts();
   const overallP = pct(done, total);
-
-  function newPageIfNeeded(need){
-    if(y + need > pageH - marginBottom){ doc.addPage(); y = 52; }
-  }
+  const norm = n => (n || "").trim().toLowerCase();
 
   /* Title */
   doc.setFont("helvetica","bold");
-  doc.setFontSize(20);
+  doc.setFontSize(18);
   doc.setTextColor(30,58,58);
   doc.text("Site Progress", marginX, y);
-  y += 22;
-
   doc.setFont("helvetica","normal");
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.setTextColor(91,115,115);
-  doc.text(dateStr, marginX, y);
+  doc.text(dateStr, marginX + 130, y);
   doc.text("Overall: " + overallP + "%  (" + done + "/" + total + " tasks)", pageW - marginX, y, { align:"right" });
-  y += 12;
+  y += 8;
   doc.setDrawColor(220,237,232);
   doc.setLineWidth(1);
   doc.line(marginX, y, pageW - marginX, y);
-  y += 22;
+  y += 18;
 
-  state.forEach((stage, si) => {
-    /* every stage shows all its plots — except Foundations, which lists only
-       plots with at least one tick (keeps the not-yet-started backlog out) */
+  function drawTick(cx, cy){
+    doc.setDrawColor(51,168,125);
+    doc.setLineWidth(1.6);
+    doc.line(cx - 4, cy, cx - 1.2, cy + 3.2);
+    doc.line(cx - 1.2, cy + 3.2, cx + 4.4, cy - 3.6);
+  }
+
+  state.forEach(stage => {
     if(stage.list) return;
     const onlyTicked = stage.progNo === 1;
     const active = onlyTicked ? stage.plots.filter(p => plotCounts(p).done > 0) : stage.plots.slice();
     if(!active.length) return;
 
+    const cols = (stage.preset && stage.preset.length) ? stage.preset.slice()
+               : (active[0].tasks.map(t => t.name));
+    if(!cols.length) return;
+    const colW = Math.min(46, (pageW - 2 * marginX - PLOT_W) / cols.length);
+    const tableW = PLOT_W + colW * cols.length;
+
+    /* vertical header height from the longest column name */
+    doc.setFontSize(7);
+    let headH = 0;
+    cols.forEach(c => { headH = Math.max(headH, doc.getTextWidth(c)); });
+    headH = Math.min(headH + 12, 130);
+
     const sc = stageCounts(stage);
     const sp = pct(sc.done, sc.total);
 
-    newPageIfNeeded(30);
-    doc.setFont("helvetica","bold");
-    doc.setFontSize(14);
-    doc.setTextColor(58,168,188);
-    doc.text(stage.name || "Stage", marginX, y);
-    doc.setFont("helvetica","normal");
-    doc.setFontSize(10);
-    doc.setTextColor(91,115,115);
-    doc.text(sp + "%  (" + sc.done + "/" + sc.total + ")", pageW - marginX, y, { align:"right" });
-    y += 16;
-
-    active.forEach(plot => {
-      const pc = plotCounts(plot);
-      newPageIfNeeded(30);
+    function stageHeader(contd){
       doc.setFont("helvetica","bold");
-      doc.setFontSize(11.5);
-      doc.setTextColor(30,58,58);
-      doc.text(plot.name || "Plot", marginX + 12, y);
+      doc.setFontSize(13);
+      doc.setTextColor(58,168,188);
+      doc.text((stage.name || "Stage") + (contd ? " (cont.)" : ""), marginX, y);
       doc.setFont("helvetica","normal");
-      doc.setFontSize(9.5);
-      doc.setTextColor(120,140,140);
-      doc.text(pc.done + "/" + pc.total, pageW - marginX, y, { align:"right" });
+      doc.setFontSize(9);
+      doc.setTextColor(91,115,115);
+      doc.text(sp + "%  (" + sc.done + "/" + sc.total + ")", pageW - marginX, y, { align:"right" });
+      y += 6;
+      doc.setDrawColor(94,198,216);
+      doc.setLineWidth(1.4);
+      doc.line(marginX, y, marginX + tableW, y);
+      y += 4;
 
-      /* programme status: days ahead + claim-by date for this stage (never for basic headers) */
-      if(plot.prog && !stage.basic && stage.progNo){
+      /* column header: "Plot" + vertical task names */
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(7);
+      doc.setTextColor(60,80,80);
+      doc.text("Plot", marginX + 4, y + headH - 5);
+      cols.forEach((c, i) => {
+        const cx = marginX + PLOT_W + i * colW + colW / 2 + 2;
+        doc.text(c, cx, y + headH - 5, { angle: 90 });
+      });
+      /* header underline + column separators */
+      doc.setDrawColor(200,220,215);
+      doc.setLineWidth(0.7);
+      doc.line(marginX, y + headH, marginX + tableW, y + headH);
+      y += headH;
+    }
+
+    function newPageIfNeeded(need, redraw){
+      if(y + need > pageH - marginBottom){
+        doc.addPage();
+        y = 48;
+        if(redraw) stageHeader(true);
+      }
+    }
+
+    newPageIfNeeded(headH + 60, false);
+    stageHeader(false);
+
+    active.forEach(p => {
+      const hasProg = p.prog && !stage.basic && stage.progNo;
+      const rowH = hasProg ? 30 : 20;
+      newPageIfNeeded(rowH, true);
+
+      /* plot name + programme line */
+      doc.setFont("helvetica","bold");
+      doc.setFontSize(10);
+      doc.setTextColor(30,58,58);
+      doc.text(p.name || "Plot", marginX + 4, y + 13);
+      if(hasProg){
         const bits = [];
-        const ahead = daysAhead(plot, stage);
-        if(ahead > 0) bits.push({ t: ahead + "d ahead of programme", c: [51,168,125] });
-        const behind = daysBehind(plot, stage);
-        if(behind > 0) bits.push({ t: behind + "d behind programme", c: [194,83,83] });
-        const due = plot.prog.est && plot.prog.est[String(stage.progNo)];
+        const ahead = daysAhead(p, stage);
+        if(ahead > 0) bits.push({ t: ahead + "d ahead", c: [51,168,125] });
+        const behind = daysBehind(p, stage);
+        if(behind > 0) bits.push({ t: behind + "d behind", c: [194,83,83] });
+        const due = p.prog.est && p.prog.est[String(stage.progNo)];
         if(due){
           const ci = claimInfo(due);
-          bits.push({
-            t: ci.st === "over" ? "claim S" + stage.progNo + " was due " + fmtDay(ci.claim) + " (" + (-ci.days) + "d over)"
-                                : "claim S" + stage.progNo + " by " + fmtDay(ci.claim) + (ci.st === "today" ? " (today)" : " (" + ci.days + "d)"),
-            c: ci.st === "over" ? [194,83,83] : ci.st === "near" || ci.st === "today" ? [169,118,26] : [58,168,188]
-          });
+          bits.push({ t: claimLabel(ci, stage.progNo),
+                      c: ci.st === "over" ? [194,83,83] : (ci.st === "near" || ci.st === "today") ? [169,118,26] : [58,168,188] });
         }
-        if(bits.length){
-          y += 12;
-          doc.setFontSize(9);
-          let bx = marginX + 12;
-          bits.forEach((b, bi) => {
-            doc.setTextColor(b.c[0], b.c[1], b.c[2]);
-            const txt = (bi ? "  ·  " : "") + b.t;
-            doc.text(txt, bx, y);
-            bx += doc.getTextWidth(txt);
-          });
-        }
-      }
-      y += 15;
-
-      plot.tasks.forEach(task => {
-        newPageIfNeeded(16);
-        const box = task.done ? "[x]" : "[ ]";
-        doc.setFont("courier","normal");
-        doc.setFontSize(10.5);
-        doc.setTextColor(task.done ? 51 : 120, task.done ? 168 : 140, task.done ? 125 : 140);
-        doc.text(box, marginX + 26, y);
-
         doc.setFont("helvetica","normal");
-        doc.setFontSize(11);
-        doc.setTextColor(30,58,58);
-        const nameX = marginX + 52;
-        const nameLines = doc.splitTextToSize(task.name || "(unnamed task)", pageW - marginX - nameX);
-        doc.text(nameLines, nameX, y);
-        y += 14 * nameLines.length;
+        doc.setFontSize(7);
+        let bx = marginX + 4;
+        bits.forEach((bit, bi) => {
+          doc.setTextColor(bit.c[0], bit.c[1], bit.c[2]);
+          const t2 = (bi ? " · " : "") + bit.t;
+          doc.text(t2, bx, y + 24);
+          bx += doc.getTextWidth(t2);
+        });
+      }
 
-        if(task.due){
-          newPageIfNeeded(13);
-          const st = dueState(task);
-          doc.setFont("helvetica","normal");
-          doc.setFontSize(9.5);
-          if(st === "over" || st === "late") doc.setTextColor(194,83,83);
-          else if(st === "today") doc.setTextColor(169,118,26);
-          else if(st === "met") doc.setTextColor(51,168,125);
-          else doc.setTextColor(58,168,188);
-          doc.text("Due " + fmtDay(task.due) + "  (" + dueLabel(task) + ")", nameX + 12, y);
-          y += 12.5;
-        }
-
-        const note = (task.note || "").trim();
-        if(note){
-          doc.setFont("helvetica","italic");
-          doc.setFontSize(9.5);
-          doc.setTextColor(120,140,140);
-          const noteLines = doc.splitTextToSize("Note: " + note, pageW - marginX - (nameX + 12));
-          noteLines.forEach(line => {
-            newPageIfNeeded(13);
-            doc.text(line, nameX + 12, y);
-            y += 12.5;
-          });
-          y += 2;
-        }
+      /* task cells */
+      cols.forEach((c, i) => {
+        const t = p.tasks.find(tt => norm(tt.name) === norm(c));
+        if(t && t.done) drawTick(marginX + PLOT_W + i * colW + colW / 2, y + rowH / 2);
       });
-      y += 6;
+
+      /* grid: row line + verticals */
+      doc.setDrawColor(210,228,222);
+      doc.setLineWidth(0.6);
+      doc.line(marginX, y + rowH, marginX + tableW, y + rowH);
+      doc.line(marginX + PLOT_W, y, marginX + PLOT_W, y + rowH);
+      for(let i = 1; i <= cols.length; i++){
+        const vx = marginX + PLOT_W + i * colW;
+        doc.line(vx, y, vx, y + rowH);
+      }
+      y += rowH;
     });
-    y += 10;
+    y += 22;
   });
 
   doc.save("Site-Progress-" + fileDate + ".pdf");
