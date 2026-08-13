@@ -532,7 +532,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 33 · 14 Aug";
+const BUILD = "build 34 · 15 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -2187,6 +2187,10 @@ function exportPDF(){
     item([228,245,238], "Ahead of programme");
     item(null,          "On track");
     item([251,228,228], "Behind programme");
+    doc.setFont("helvetica","normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(58,168,188);
+    doc.text("12/9 = date the trade promised", kx + 6, ky);
   }
   drawKey();
 
@@ -2318,10 +2322,21 @@ function exportPDF(){
         });
       });
 
-      /* task cells */
+      /* task cells: tick when done, otherwise the promised date if one is set */
       cols.forEach((c, i) => {
         const t = p.tasks.find(tt => norm(tt.name) === norm(c));
-        if(t && t.done) drawTick(marginX + PLOT_W + i * colW + colW / 2, y + rowH / 2);
+        const cx = marginX + PLOT_W + i * colW + colW / 2;
+        if(t && t.done){ drawTick(cx, y + rowH / 2); }
+        else if(t && t.due){
+          const st = dueState(t);
+          if(st === "over") doc.setTextColor(194,83,83);
+          else if(st === "today") doc.setTextColor(169,118,26);
+          else doc.setTextColor(58,168,188);
+          doc.setFont("helvetica","normal");
+          doc.setFontSize(6.4);
+          const dd = new Date(t.due + "T00:00:00");
+          doc.text(dd.getDate() + "/" + (dd.getMonth() + 1), cx, y + rowH / 2 + 2.2, { align: "center" });
+        }
       });
 
       /* grid: row line + verticals */
@@ -2459,7 +2474,8 @@ function exportCommentsPDF(){
   state.forEach(stage => {
     const rows = [];
     stage.plots.forEach(p => p.tasks.forEach(t => {
-      if((t.note || "").trim()){ rows.push({ p: p, t: t }); count++; }
+      /* General (list) headers: every task is an action item, note or not */
+      if(stage.list || (t.note || "").trim()){ rows.push({ p: p, t: t }); count++; }
     }));
     if(rows.length) groups.push({ stage: stage, rows: rows });
   });
@@ -2503,7 +2519,8 @@ function exportCommentsPDF(){
     y += 16;
 
     g.rows.forEach(r => {
-      const noteLines = doc.splitTextToSize((r.t.note || "").trim(), pageW - marginX * 2 - 24);
+      const noteTxt = (r.t.note || "").trim();
+      const noteLines = noteTxt ? doc.splitTextToSize(noteTxt, pageW - marginX * 2 - 24) : [];
       newPageIfNeeded(18 + noteLines.length * 12.5 + 8);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
