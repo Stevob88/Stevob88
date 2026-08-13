@@ -356,6 +356,16 @@
     padding:8px 11px;cursor:pointer;
   }
   #plan-btn svg{width:16px;height:16px;}
+  #backup-btn{
+    flex-shrink:0;width:36px;height:34px;display:inline-flex;align-items:center;justify-content:center;
+    border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--blue-dark);cursor:pointer;padding:0;
+  }
+  #backup-btn svg{width:16px;height:16px;}
+  .restore-row{text-align:center;padding:4px 0 0;}
+  .restore-row button{
+    border:none;background:transparent;color:var(--ink-soft);opacity:.75;
+    font-family:inherit;font-size:11px;text-decoration:underline;cursor:pointer;padding:6px;
+  }
   .plan-overlay{
     position:fixed;inset:0;z-index:100;background:#F4FAF8;
     display:flex;flex-direction:column;
@@ -427,6 +437,9 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14"/><path d="M15 6v14"/></svg>
       Plan
     </button>
+    <button id="backup-btn" aria-label="Backup app data">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M4 15v4a1 1 0 001 1h14a1 1 0 001-1v-4"/></svg>
+    </button>
   </div>
   <div class="overall-row">
     <div class="overall-bar-wrap">
@@ -486,12 +499,13 @@
 </div>
 <input type="file" id="plan-file" accept="application/pdf,.pdf" hidden />
 <input type="file" id="prog-file" accept="application/pdf,.pdf" hidden />
+<input type="file" id="restore-file" accept="application/json,.json" hidden />
 
 <script>
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 24 · 13 Aug";
+const BUILD = "build 25 · 13 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -1386,6 +1400,14 @@ function render(){
   tag.className = "build-tag";
   tag.textContent = "Site Progress · " + BUILD;
   app.appendChild(tag);
+
+  const rr = document.createElement("div");
+  rr.className = "restore-row";
+  const rb = document.createElement("button");
+  rb.textContent = "Restore from backup";
+  rb.onclick = () => document.getElementById("restore-file").click();
+  rr.appendChild(rb);
+  app.appendChild(rr);
 
   renderOverall();
 }
@@ -2372,6 +2394,49 @@ document.getElementById("export-btn").addEventListener("click", exportPDF);
 /* Persist just before the app is backgrounded/closed (belt & braces on top of debounced save) */
 window.addEventListener("pagehide", saveNow);
 
+/* ============================================================
+   Backup / restore — move the whole app's data between phones
+   (everything lives on-device; the site plan PDF is re-attached
+   separately since it is stored in file storage)
+   ============================================================ */
+function backupData(){
+  return { kind: "site-progress-backup", version: 2, at: Date.now(),
+           state: state, timeline: timeline, completed: completed, programData: programData };
+}
+function exportBackup(){
+  saveNow();
+  const d = new Date();
+  const name = "Site-Progress-Backup-" + d.getFullYear() + "-" +
+    String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") + ".json";
+  const json = JSON.stringify(backupData());
+  try{
+    const file = new File([json], name, { type: "application/json" });
+    if(navigator.canShare && navigator.canShare({ files: [file] })){
+      navigator.share({ files: [file], title: "Site Progress backup" }).catch(() => {});
+      return;
+    }
+  }catch(e){}
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+  a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  showToast("Backup saved");
+}
+function importBackup(f){
+  f.text().then(txt => {
+    const d = JSON.parse(txt);
+    if(!d || d.kind !== "site-progress-backup" || !Array.isArray(d.state)) throw new Error("bad backup");
+    if(!confirm("Restore backup from " + fmtDate(d.at) + "?\n\nThis REPLACES everything currently in this app on this phone.")) return;
+    state = migrate(normalize(d.state));
+    timeline = d.timeline || {};
+    completed = Array.isArray(d.completed) ? d.completed : [];
+    programData = d.programData || null;
+    saveNow(); render();
+    showToast("Backup restored");
+  }).catch(err => { console.warn(err); showToast("That's not a Site Progress backup file"); });
+}
+
 /* ---- self-update: fetch a fresh copy of this page and reload if the build is newer ---- */
 function checkForUpdate(){
   try{
@@ -2404,6 +2469,12 @@ document.addEventListener("visibilitychange", () => {
 
 planBind();
 bindProgram();
+document.getElementById("backup-btn").onclick = exportBackup;
+document.getElementById("restore-file").onchange = e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if(f) importBackup(f);
+};
 render();
 checkForUpdate();
 </script>
