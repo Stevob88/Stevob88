@@ -299,6 +299,14 @@
   }
   #export-btn:active{background:var(--blue-dark);}
   #export-btn svg{width:20px;height:20px;}
+  #evidence-btn{
+    pointer-events:auto;
+    width:100%;margin-bottom:8px;padding:11px;border:1.5px solid var(--amber);border-radius:12px;
+    background:#fff;color:#A9761A;font-family:'Archivo',sans-serif;font-weight:700;font-size:14px;
+    display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
+  }
+  #evidence-btn:active{background:#FDF0D9;}
+  #evidence-btn svg{width:16px;height:16px;}
 
   .toast{
     position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 92px);transform:translateX(-50%) translateY(20px);
@@ -459,6 +467,10 @@
 <main id="app"></main>
 
 <div class="export-bar">
+  <button id="evidence-btn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+    Fire photo &amp; Part L to-do
+  </button>
   <button id="export-btn">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>
     Export as PDF
@@ -509,7 +521,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 27 · 14 Aug";
+const BUILD = "build 28 · 14 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -2155,6 +2167,103 @@ function exportPDF(){
 }
 
 /* ============================================================
+   Fire photo & Part L to-do — printable list of every outstanding
+   evidence task, per plot, for walking the site with a camera
+   ============================================================ */
+function isEvidenceTask(name){
+  const n = (name || "").trim().toLowerCase();
+  return n === "fire photo" || n.indexOf("part l") === 0;
+}
+
+function exportEvidencePDF(){
+  const lib = window.jspdf || {};
+  if(!lib.jsPDF){ showToast("PDF library not loaded — check connection"); return; }
+  const doc = new lib.jsPDF({ unit: "pt", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginX = 40, marginBottom = 46;
+  let y = 52;
+  const newPageIfNeeded = need => { if(y + need > pageH - marginBottom){ doc.addPage(); y = 52; } };
+
+  /* gather: stage -> plots with outstanding evidence tasks */
+  const groups = [];
+  let items = 0, plotsN = 0;
+  state.forEach(stage => {
+    const rows = [];
+    stage.plots.forEach(p => {
+      const todo = p.tasks.filter(t => !t.done && isEvidenceTask(t.name));
+      if(todo.length){ rows.push({ p: p, todo: todo }); items += todo.length; plotsN++; }
+    });
+    if(rows.length) groups.push({ stage: stage, rows: rows });
+  });
+
+  const today = new Date();
+  const dateStr2 = today.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  const fileDate = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.setTextColor(30, 58, 58);
+  doc.text("Fire Photo & Part L — Outstanding", marginX, y);
+  y += 22;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(91, 115, 115);
+  doc.text(dateStr2, marginX, y);
+  doc.text(items + " items across " + plotsN + " plots", pageW - marginX, y, { align: "right" });
+  y += 12;
+  doc.setDrawColor(220, 237, 232);
+  doc.setLineWidth(1);
+  doc.line(marginX, y, pageW - marginX, y);
+  y += 22;
+
+  if(!groups.length){
+    doc.setFontSize(12);
+    doc.setTextColor(51, 168, 125);
+    doc.text("Nothing outstanding — every Fire photo and Part L task is ticked.", marginX, y);
+  }
+
+  groups.forEach(g => {
+    newPageIfNeeded(30);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(58, 168, 188);
+    doc.text(g.stage.name || "Stage", marginX, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(91, 115, 115);
+    const n = g.rows.reduce((a, r) => a + r.todo.length, 0);
+    doc.text(n + " item" + (n === 1 ? "" : "s"), pageW - marginX, y, { align: "right" });
+    y += 16;
+
+    g.rows.forEach(r => {
+      newPageIfNeeded(20 + r.todo.length * 15);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11.5);
+      doc.setTextColor(30, 58, 58);
+      doc.text(r.p.name || "Plot", marginX + 12, y);
+      y += 15;
+      r.todo.forEach(t => {
+        newPageIfNeeded(16);
+        doc.setDrawColor(120, 140, 140);
+        doc.setLineWidth(1);
+        doc.rect(marginX + 26, y - 8.5, 10, 10);            /* hand-tick box */
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(11);
+        doc.setTextColor(30, 58, 58);
+        doc.text(t.name || "(unnamed task)", marginX + 44, y);
+        y += 15;
+      });
+      y += 4;
+    });
+    y += 10;
+  });
+
+  doc.save("Fire-PartL-Outstanding-" + fileDate + ".pdf");
+  showToast("To-do list exported");
+}
+
+/* ============================================================
    Site layout plan — a PDF kept on this device (IndexedDB, so a
    multi-megabyte drawing is fine) and rendered with PDF.js
    ============================================================ */
@@ -2468,6 +2577,7 @@ function showToast(msg){
    Boot
    ============================================================ */
 document.getElementById("export-btn").addEventListener("click", exportPDF);
+document.getElementById("evidence-btn").addEventListener("click", exportEvidencePDF);
 
 /* Persist just before the app is backgrounded/closed (belt & braces on top of debounced save) */
 window.addEventListener("pagehide", saveNow);
