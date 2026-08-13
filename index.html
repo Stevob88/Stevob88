@@ -176,6 +176,7 @@
     padding:9px 4px;border-top:1px solid var(--line);
   }
   .task:first-child{border-top:none;}
+  .task-swipe{touch-action:pan-y;background:var(--card);will-change:transform;}
   .tick{
     width:30px;height:30px;flex-shrink:0;border-radius:9px;
     border:2px solid var(--line);background:#fff;
@@ -521,7 +522,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 28 · 14 Aug";
+const BUILD = "build 29 · 14 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -560,6 +561,7 @@ const SEED = [
   ["2nd Fix",            ["Mistcoat","Joiner 2nd fix","Plumber 2nd fix","Electrician 2nd fix","wall tiler","Kitchen","Patcher"]],
   ["Paint & Decoration", ["Painter"]],
   ["Finals",             ["Build clean","Part L - 3a Loft Insulation","Part L - 6a PV Invertor","Part L - 6a Boiler","Part L - 6c Fan Duct","Mastic","Joiner Final","Electrician Final","PV Commission","Plumber final","Flooring","Patcher final","Paint final","Appliances","Reclean","All Trade Snags","CML"]],
+  ["General",            [], true, true],
 ];
 /* Canonical order of the nine programme flow stages -> progNo 1..9 */
 const FLOW_NAMES = ["Foundations","Substructure","Superstructure","Roof","1st Fix","Plasterboard","2nd Fix","Paint & Decoration","Finals"];
@@ -575,11 +577,12 @@ const uid = () => "id" + (Date.now().toString(36)) + (uidCounter++).toString(36)
 
 function buildSeed(){
   let flowNo = 0;
-  return SEED.map(([name, preset, basic]) => ({
+  return SEED.map(([name, preset, basic, list]) => ({
     id: uid(),
     name,
     open: false,
     basic: !!basic,
+    list: !!list,
     progNo: basic ? null : ++flowNo,
     preset: preset.slice(),
     plots: basic ? [] : [1,2].map(n => ({
@@ -794,6 +797,18 @@ function migrate(stages){
     }
   }catch(e){}
 
+  /* one-time: add the General task-list header at the very end */
+  try{
+    if(!localStorage.getItem("siteProgress.general.v1")){
+      if(!stages.some(s => (s.name || "").trim().toLowerCase() === "general")){
+        stages.push({ id: uid(), name: "General", open: false, basic: true, list: true,
+                      progNo: null, preset: [], plots: [] });
+      }
+      localStorage.setItem("siteProgress.general.v1", "1");
+      localStorage.setItem(STORE_KEY, JSON.stringify(stages));
+    }
+  }catch(e){}
+
   /* keep Superstructure clean: the split-out tasks leave its preset, and leave
      existing plots' checklists unless already ticked (history is kept) */
   const STRIP = /^(brickwork|nhbc superstructure)$/i;
@@ -814,6 +829,7 @@ function normalize(stages){
     name: s.name || "Stage",
     open: !!s.open,
     basic: !!s.basic,
+    list: !!s.list,
     progNo: (typeof s.progNo === "number") ? s.progNo : null,
     preset: Array.isArray(s.preset) ? s.preset.slice() : [],
     plots: (s.plots || []).map(p => ({
@@ -1406,7 +1422,11 @@ function plotCounts(plot){
 }
 function overallCounts(){
   let done = 0, total = 0;
-  state.forEach(s => { const c = stageCounts(s); done += c.done; total += c.total; });
+  state.forEach(s => {
+    if(s.list) return;                 /* General to-dos stay out of build progress */
+    const c = stageCounts(s);
+    done += c.done; total += c.total;
+  });
   return { done, total };
 }
 const pct = (done, total) => total === 0 ? 0 : Math.round((done/total)*100);
@@ -1638,39 +1658,121 @@ function renderStage(stage){
   title.appendChild(nameInput);
 
   const chip = document.createElement("span");
-  chip.className = "chip" + (total>0 && done===total ? " done" : "");
-  chip.textContent = p + "%";
+  if(stage.list){
+    const open = total - done;
+    chip.className = "chip" + (total > 0 && open === 0 ? " done" : "");
+    chip.textContent = open + " open";
+  } else {
+    chip.className = "chip" + (total>0 && done===total ? " done" : "");
+    chip.textContent = p + "%";
+  }
 
   head.appendChild(title);
   head.appendChild(chip);
   head.onclick = () => { stage.open = !stage.open; save(); el.classList.toggle("open", stage.open); };
   el.appendChild(head);
 
-  /* progress bar */
-  const prog = document.createElement("div");
-  prog.className = "stage-progress";
-  prog.innerHTML = '<div class="bar"><span style="width:'+p+'%"></span></div>';
-  el.appendChild(prog);
+  /* progress bar (not for simple list headers) */
+  if(!stage.list){
+    const prog = document.createElement("div");
+    prog.className = "stage-progress";
+    prog.innerHTML = '<div class="bar"><span style="width:'+p+'%"></span></div>';
+    el.appendChild(prog);
+  }
 
   /* body */
   const body = document.createElement("div");
   body.className = "stage-body";
-  stage.plots.forEach(plot => body.appendChild(renderPlot(stage, plot)));
 
-  const tools = document.createElement("div");
-  tools.className = "stage-tools";
-  const addPlot = document.createElement("button");
-  addPlot.className = "add-btn";
-  addPlot.innerHTML = ICON.plus + " Add plot";
-  addPlot.onclick = () => {
-    plot_new(stage);
-    save(); render();
-  };
-  tools.appendChild(addPlot);
-  body.appendChild(tools);
+  if(stage.list){
+    /* a plain task list held in one hidden plot: add tasks, tick them,
+       swipe a row right to delete it */
+    const holder = listHolder(stage);
+    holder.tasks.forEach(task => {
+      const row = renderTask(stage, holder, task);
+      attachTaskDeleteSwipe(row, holder, task);
+      body.appendChild(row);
+    });
+    const addTask = document.createElement("button");
+    addTask.className = "add-btn add-task-btn";
+    addTask.innerHTML = ICON.plus + " Add task";
+    addTask.onclick = () => {
+      holder.tasks.push({ id: uid(), name: "", done:false, doneAt:null, due:null, note:"", noteOpen:false });
+      save(); render();
+    };
+    body.appendChild(addTask);
+  } else {
+    stage.plots.forEach(plot => body.appendChild(renderPlot(stage, plot)));
+
+    const tools = document.createElement("div");
+    tools.className = "stage-tools";
+    const addPlot = document.createElement("button");
+    addPlot.className = "add-btn";
+    addPlot.innerHTML = ICON.plus + " Add plot";
+    addPlot.onclick = () => {
+      plot_new(stage);
+      save(); render();
+    };
+    tools.appendChild(addPlot);
+    body.appendChild(tools);
+  }
 
   el.appendChild(body);
   return el;
+}
+
+/* The single hidden plot that backs a list header's tasks */
+function listHolder(stage){
+  if(!stage.plots.length){
+    stage.plots.push({ id: uid(), name: stage.name, open: true, prog: null, tasks: [] });
+  }
+  return stage.plots[0];
+}
+
+/* Swipe a list task right to delete it (its "done" gesture) */
+function attachTaskDeleteSwipe(row, holder, task){
+  row.classList.add("task-swipe");
+  let startX = 0, startY = 0, dx = 0, dragging = false, decided = false, horiz = false;
+  row.addEventListener("pointerdown", e => {
+    if(e.pointerType === "mouse" && e.button !== 0) return;
+    startX = e.clientX; startY = e.clientY;
+    dx = 0; dragging = true; decided = false; horiz = false;
+    row.style.transition = "none";
+  });
+  row.addEventListener("pointermove", e => {
+    if(!dragging) return;
+    const mx = e.clientX - startX, my = e.clientY - startY;
+    if(!decided && (Math.abs(mx) > 8 || Math.abs(my) > 8)){
+      decided = true;
+      horiz = Math.abs(mx) > Math.abs(my);
+      if(horiz){ try{ row.setPointerCapture(e.pointerId); }catch(_){ } }
+    }
+    if(decided && horiz){
+      dx = Math.max(0, Math.min(mx, 200));      /* right only */
+      row.style.transform = "translateX(" + dx + "px)";
+      row.style.opacity = String(1 - dx / 240);
+    }
+  });
+  const end = () => {
+    if(!dragging) return;
+    dragging = false;
+    if(decided && horiz && dx >= 72){
+      row.style.transition = "transform .18s ease, opacity .18s ease";
+      row.style.transform = "translateX(110%)";
+      row.style.opacity = "0";
+      setTimeout(() => {
+        holder.tasks = holder.tasks.filter(t => t.id !== task.id);
+        saveNow(); render();
+        showToast("Task removed");
+      }, 180);
+    } else {
+      row.style.transition = "transform .2s ease, opacity .2s ease";
+      row.style.transform = "translateX(0)";
+      row.style.opacity = "1";
+    }
+  };
+  row.addEventListener("pointerup", end);
+  row.addEventListener("pointercancel", end);
 }
 
 function plot_new(stage){
@@ -1910,7 +2012,7 @@ function renderTask(stage, plot, task){
     if(task.done){
       task.doneAt = nowMs();
       logEvent(plot.name, stage.name, task.name, task.doneAt);
-      if(isCML(task.name)){
+      if(isCML(task.name) && !stage.basic && !stage.list){
         completePlot(stage, plot);
         saveNow(); render();
         showToast('"' + plot.name + '" complete → Completed Plots');
@@ -2054,6 +2156,7 @@ function exportPDF(){
     /* only plots with at least one ticked task make the report — except the
        last three flow stages (2nd Fix, Paint & Decoration, Finals), which
        always show every plot */
+    if(stage.list) return;
     const showAll = !stage.basic && stage.progNo >= 7 && stage.progNo <= 9;
     const active = showAll ? stage.plots.slice() : stage.plots.filter(p => plotCounts(p).done > 0);
     if(!active.length) return;
@@ -2189,6 +2292,7 @@ function exportEvidencePDF(){
   const groups = [];
   let items = 0, plotsN = 0;
   state.forEach(stage => {
+    if(stage.list) return;
     const rows = [];
     stage.plots.forEach(p => {
       const todo = p.tasks.filter(t => !t.done && isEvidenceTask(t.name));
