@@ -140,6 +140,10 @@
     background:linear-gradient(90deg,var(--green-light),var(--green));
     color:#fff;font-weight:700;font-size:14px;white-space:nowrap;
   }
+  .plot-swipe-action.back{
+    justify-content:flex-start;
+    background:linear-gradient(90deg,var(--danger),#EFA46B);
+  }
   .plot-swipe-action .lbl{overflow:hidden;text-overflow:ellipsis;max-width:60%;}
   .plot-swipe-action svg{width:20px;height:20px;flex-shrink:0;}
   .plot-head{
@@ -505,7 +509,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 26 · 14 Aug";
+const BUILD = "build 27 · 14 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -517,6 +521,7 @@ const ICON = {
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/><path d="M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13"/></svg>',
   plus:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>',
   arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>',
+  arrowL:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>',
   clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   medal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3l4 6 4-6"/><circle cx="12" cy="15" r="6"/><path d="M12 13v4M10 15h4"/></svg>',
   undo:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l-4-4 4-4"/><path d="M5 10h10a4 4 0 010 8h-3"/></svg>',
@@ -1142,12 +1147,33 @@ function aheadChip(days){
   return c;
 }
 
+/* Days behind: the programme's current stage is past this plot's stage, and the
+   claim for the stage the plot sits in went by N days ago. */
+function daysBehind(plot, stage){
+  const pr = plot.prog;
+  if(!stage || stage.basic || !stage.progNo) return 0;
+  if(!pr || !pr.est || !pr.current) return 0;
+  if(stage.progNo >= pr.current) return 0;
+  const due = pr.est[String(stage.progNo)];
+  if(!due) return 0;
+  const d = -claimInfo(due).days;
+  return d > 0 ? d : 0;
+}
+function behindChip(days){
+  const c = document.createElement("span");
+  c.className = "due-chip over";
+  c.textContent = days + "d behind";
+  return c;
+}
+
 /* Returns 0-2 chips for a plot row: green "Nd ahead" and/or the claim countdown */
 function progChips(plot, stage){
   const out = [];
   if(!plot.prog || !stage || stage.basic || !stage.progNo) return out;
   const ahead = daysAhead(plot, stage);
   if(ahead > 0) out.push(aheadChip(ahead));
+  const behind = daysBehind(plot, stage);
+  if(behind > 0) out.push(behindChip(behind));
   const due = plot.prog.est && plot.prog.est[String(stage.progNo)];
   if(due){
     const ci = claimInfo(due);
@@ -1319,6 +1345,8 @@ function renderProgSection(){
       row.appendChild(info2);
       const ah = daysAhead(r.p, r.stage);
       if(ah > 0) row.appendChild(aheadChip(ah));
+      const bh = daysBehind(r.p, r.stage);
+      if(bh > 0) row.appendChild(behindChip(bh));
       row.appendChild(chip);
       row.onclick = () => {
         r.stage.open = true; r.p.open = true; save(); render();
@@ -1646,18 +1674,31 @@ function renderPlot(stage, plot){
   const si = state.indexOf(stage);
   const nextStage = nextFlowStage(stage);            /* basic headers are skipped, and have no swipe */
 
+  const prevStage = prevFlowStage(stage);
   const swipe = document.createElement("div");
   swipe.className = "plot-swipe";
 
+  let fwdAction = null, backAction = null;
   if(nextStage){
-    const action = document.createElement("div");
-    action.className = "plot-swipe-action";
+    fwdAction = document.createElement("div");
+    fwdAction.className = "plot-swipe-action";
     const lbl = document.createElement("span");
     lbl.className = "lbl";
     lbl.textContent = nextStage.name;
-    action.appendChild(lbl);
-    action.insertAdjacentHTML("beforeend", ICON.arrow);
-    swipe.appendChild(action);
+    fwdAction.appendChild(lbl);
+    fwdAction.insertAdjacentHTML("beforeend", ICON.arrow);
+    swipe.appendChild(fwdAction);
+  }
+  if(prevStage){
+    backAction = document.createElement("div");
+    backAction.className = "plot-swipe-action back";
+    backAction.insertAdjacentHTML("beforeend", ICON.arrowL);
+    const lbl = document.createElement("span");
+    lbl.className = "lbl";
+    lbl.textContent = prevStage.name;
+    backAction.appendChild(lbl);
+    backAction.style.opacity = "0";
+    swipe.appendChild(backAction);
   }
 
   const head = document.createElement("div");
@@ -1691,7 +1732,7 @@ function renderPlot(stage, plot){
   swipe.appendChild(head);
   el.appendChild(swipe);
 
-  if(nextStage) attachSwipe(head, stage, plot);
+  if(nextStage || prevStage) attachSwipe(head, stage, plot, fwdAction, backAction);
 
   const body = document.createElement("div");
   body.className = "plot-body";
@@ -1733,8 +1774,9 @@ function renderPlot(stage, plot){
 }
 
 /* Swipe a plot row left to advance it to the next stage */
-function attachSwipe(head, stage, plot){
+function attachSwipe(head, stage, plot, fwdAction, backAction){
   const MAX = 150, TRIG = 72;
+  const canFwd = !!fwdAction, canBack = !!backAction;
   let startX = 0, startY = 0, dx = 0, dragging = false, decided = false, horiz = false;
 
   const settle = () => {
@@ -1758,8 +1800,10 @@ function attachSwipe(head, stage, plot){
       if(horiz){ try{ head.setPointerCapture(e.pointerId); }catch(_){ } }
     }
     if(decided && horiz){
-      dx = Math.max(-MAX, Math.min(0, mx));   /* left only */
+      dx = Math.min(canBack ? MAX : 0, Math.max(canFwd ? -MAX : 0, mx));  /* left = forward, right = back */
       head.style.transform = "translateX(" + dx + "px)";
+      if(fwdAction)  fwdAction.style.opacity  = dx < 0 ? "1" : "0";
+      if(backAction) backAction.style.opacity = dx > 0 ? "1" : "0";
       if(Math.abs(dx) > 6) head.__swiped = true;
     }
   });
@@ -1767,9 +1811,11 @@ function attachSwipe(head, stage, plot){
   const end = () => {
     if(!dragging) return;
     dragging = false;
-    const trigger = decided && horiz && dx <= -TRIG;
+    const fwd = decided && horiz && dx <= -TRIG && canFwd;
+    const back = decided && horiz && dx >= TRIG && canBack;
     settle();
-    if(trigger) setTimeout(() => movePlotToNextStage(stage, plot), 80);
+    if(fwd) setTimeout(() => movePlotToNextStage(stage, plot), 80);
+    else if(back) setTimeout(() => movePlotToPrevStage(stage, plot), 80);
     setTimeout(() => { head.__swiped = false; }, 60);
   };
   head.addEventListener("pointerup", end);
@@ -1785,6 +1831,33 @@ function nextFlowStage(stage){
     if(!state[i].basic) return state[i];
   }
   return null;
+}
+function prevFlowStage(stage){
+  const si = state.indexOf(stage);
+  if(si < 0 || stage.basic) return null;
+  for(let i = si - 1; i >= 0; i--){
+    if(!state[i].basic) return state[i];
+  }
+  return null;
+}
+
+/* Swipe right: drop a plot back to the previous flow stage (fresh checklist there;
+   the Time Scale Logs keep the history of what was already done). */
+function movePlotToPrevStage(stage, plot){
+  const prev = prevFlowStage(stage);
+  if(!prev){ showToast('"' + plot.name + '" is at the first stage'); return; }
+  if(!confirm('Move "' + plot.name + '" BACK to "' + prev.name + '"?')) return;
+
+  stage.plots = stage.plots.filter(p => p.id !== plot.id);
+  const existing = prev.plots.find(p => p.name.trim().toLowerCase() === plot.name.trim().toLowerCase());
+  if(!existing){
+    prev.plots.push({ id: uid(), name: plot.name, open: false, prog: plot.prog || null, tasks: tasksFromStage(prev) });
+  } else if(!existing.prog && plot.prog){
+    existing.prog = plot.prog;
+  }
+  prev.open = true;
+  saveNow(); render();
+  showToast('"' + plot.name + '" moved back to ' + prev.name);
 }
 
 function movePlotToNextStage(stage, plot){
@@ -2004,6 +2077,8 @@ function exportPDF(){
         const bits = [];
         const ahead = daysAhead(plot, stage);
         if(ahead > 0) bits.push({ t: ahead + "d ahead of programme", c: [51,168,125] });
+        const behind = daysBehind(plot, stage);
+        if(behind > 0) bits.push({ t: behind + "d behind programme", c: [194,83,83] });
         const due = plot.prog.est && plot.prog.est[String(stage.progNo)];
         if(due){
           const ci = claimInfo(due);
