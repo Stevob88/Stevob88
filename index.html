@@ -532,7 +532,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 32 · 14 Aug";
+const BUILD = "build 33 · 14 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -2135,7 +2135,7 @@ function exportPDF(){
   const pageH = doc.internal.pageSize.getHeight();
   const marginX = 36;
   const marginBottom = 40;
-  const PLOT_W = 118;
+  const PLOT_W = 148;
   let y = 48;
 
   const today = new Date();
@@ -2256,7 +2256,34 @@ function exportPDF(){
 
     active.forEach(p => {
       const hasProg = p.prog && !stage.basic && stage.progNo;
-      const rowH = hasProg ? 30 : 20;
+
+      /* programme status bits, wrapped to fit inside the plot column */
+      let lines = [];
+      if(hasProg){
+        const bits = [];
+        const ahead = daysAhead(p, stage);
+        if(ahead > 0) bits.push({ t: ahead + "d ahead", c: [51,168,125] });
+        const behind = daysBehind(p, stage);
+        if(behind > 0) bits.push({ t: behind + "d behind", c: [194,83,83] });
+        const due = p.prog.est && p.prog.est[String(stage.progNo)];
+        if(due){
+          const ci = claimInfo(due);
+          bits.push({ t: claimLabel(ci, stage.progNo),
+                      c: ci.st === "over" ? [194,83,83] : (ci.st === "near" || ci.st === "today") ? [169,118,26] : [58,168,188] });
+        }
+        doc.setFont("helvetica","normal");
+        doc.setFontSize(6.8);
+        const maxW = PLOT_W - 10;
+        let cur = [], curW = 0;
+        bits.forEach(bit => {
+          const sep = cur.length ? " · " : "";
+          const w = doc.getTextWidth(sep + bit.t);
+          if(cur.length && curW + w > maxW){ lines.push(cur); cur = [bit]; curW = doc.getTextWidth(bit.t); }
+          else { cur.push(bit); curW += w; }
+        });
+        if(cur.length) lines.push(cur);
+      }
+      const rowH = lines.length ? 22 + lines.length * 9 : 20;
       newPageIfNeeded(rowH, true);
 
       /* plot box highlight: green = ahead, red = behind or overdue claim */
@@ -2273,33 +2300,23 @@ function exportPDF(){
         doc.rect(marginX, y, PLOT_W, rowH, "F");
       }
 
-      /* plot name + programme line */
+      /* plot name + wrapped programme lines, all inside the plot cell */
       doc.setFont("helvetica","bold");
       doc.setFontSize(10);
       doc.setTextColor(30,58,58);
       doc.text(p.name || "Plot", marginX + 4, y + 13);
-      if(hasProg){
-        const bits = [];
-        const ahead = daysAhead(p, stage);
-        if(ahead > 0) bits.push({ t: ahead + "d ahead", c: [51,168,125] });
-        const behind = daysBehind(p, stage);
-        if(behind > 0) bits.push({ t: behind + "d behind", c: [194,83,83] });
-        const due = p.prog.est && p.prog.est[String(stage.progNo)];
-        if(due){
-          const ci = claimInfo(due);
-          bits.push({ t: claimLabel(ci, stage.progNo),
-                      c: ci.st === "over" ? [194,83,83] : (ci.st === "near" || ci.st === "today") ? [169,118,26] : [58,168,188] });
-        }
-        doc.setFont("helvetica","normal");
-        doc.setFontSize(7);
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(6.8);
+      lines.forEach((ln, li) => {
         let bx = marginX + 4;
-        bits.forEach((bit, bi) => {
+        const ly = y + 22 + li * 9;
+        ln.forEach((bit, bi) => {
           doc.setTextColor(bit.c[0], bit.c[1], bit.c[2]);
           const t2 = (bi ? " · " : "") + bit.t;
-          doc.text(t2, bx, y + 24);
+          doc.text(t2, bx, ly);
           bx += doc.getTextWidth(t2);
         });
-      }
+      });
 
       /* task cells */
       cols.forEach((c, i) => {
