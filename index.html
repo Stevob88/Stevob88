@@ -532,7 +532,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 34 · 15 Aug";
+const BUILD = "build 35 · 15 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -567,7 +567,7 @@ const SEED = [
   ["Brickwork",          ["Brickwork 1st Lift","Fire photo","NHBC Super Inspection","Brickwork 2nd Lift","Scaffold Adaption","Brickwork Eaves + Gable","Window Detape","Down Pipes","Scaffold Dismantle"], true],
   ["Roof",               ["Felt & Batten","Fire photo","Pv Panel","Part L - 6a PV Panel","Roof tile"]],
   ["1st Fix",            ["Joiner Prefix","Electrician Prefix","Plumber Prefix","VCL","Joiner 1st Fix","Plumber 1st Fix","Electrician 1st Fix","Party Wall","Windows","Joiner Dropbacks","Part L - 2b Joist Insulation","Part L - 3a Eaves Insulation","Part L - 4a Windows","Part L - 4b Doors","Part L - 6a WWHR","Barratt","NHBC Preplaster"]],
-  ["Plasterboard",       ["Boarder","Taper","MF Ceiling"]],
+  ["Plasterboard",       ["Boarder","Taper"]],
   ["2nd Fix",            ["Mistcoat","Joiner 2nd fix","Plumber 2nd fix","Electrician 2nd fix","wall tiler","Kitchen","Patcher"]],
   ["Paint & Decoration", ["Painter"]],
   ["Finals",             ["Build clean","Part L - 3a Loft Insulation","Part L - 6a PV Invertor","Part L - 6a Boiler","Part L - 6c Fan Duct","Mastic","Joiner Final","Electrician Final","PV Commission","Plumber final","Flooring","Patcher final","Paint final","Appliances","Reclean","All Trade Snags","CML"]],
@@ -806,6 +806,16 @@ function migrate(stages){
       localStorage.setItem(STORE_KEY, JSON.stringify(stages));
     }
   }catch(e){}
+
+  /* keep Plasterboard clean: MF Ceiling left the preset; unticked copies go, ticked stay */
+  const PB_STRIP = /^mf ceiling$/i;
+  const pb = stages.find(s2 => s2.progNo === 6);
+  if(pb){
+    pb.preset = (pb.preset || []).filter(n => !PB_STRIP.test((n || "").trim()));
+    pb.plots.forEach(p => {
+      p.tasks = p.tasks.filter(t => t.done || !PB_STRIP.test((t.name || "").trim()));
+    });
+  }
 
   /* one-time: add the General task-list header at the very end */
   try{
