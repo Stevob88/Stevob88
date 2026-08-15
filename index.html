@@ -83,7 +83,7 @@
   .bar > span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--blue),var(--green-light));transition:width .3s ease;}
 
   /* ---------- Main scroll area ---------- */
-  main{padding:14px 14px 120px;}
+  main{padding:14px 14px calc(env(safe-area-inset-bottom) + 205px);}
 
   /* ---------- Stage card ---------- */
   .stage{
@@ -532,7 +532,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 40 · 15 Aug";
+const BUILD = "build 41 · 15 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
