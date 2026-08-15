@@ -532,7 +532,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 36 · 15 Aug";
+const BUILD = "build 37 · 15 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -565,7 +565,7 @@ const SEED = [
   ["Substructure",       ["Blockwork","drainage","NHBC Drainage","Block and Beam","Insulation","Part L - 1a Perimeter","Part L - 1b Doorway","Pour Slab","Soleplate","Part L - 1c Therm Edge","Splash","Scaff Matt"]],
   ["Superstructure",     ["Scaffold","Crane","Timberframe","Part L - 2a VCL Lap","Oregon Externals"]],
   ["Brickwork",          ["Brickwork 1st Lift","Fire photo","Detached - Eaves","Detached - Windows/Doors","Detached - Service Penetrations","Detached - Gables","Semi/Terrace - Party Wall","Semi/Terrace - Eaves","Semi/Terrace - Windows/Doors","Semi/Terrace - Penetration","Semi/Terrace - Gable","Semi/Terrace - Cladding","NHBC Super Inspection","Brickwork 2nd Lift","Scaffold Adaption","Brickwork Eaves + Gable","Window Detape","Down Pipes","Scaffold Dismantle"], true],
-  ["Roof",               ["Felt & Batten","Fire photo","Pv Panel","Part L - 6a PV Panel","Roof tile"]],
+  ["Roof",               ["Felt & Batten","Fire photo","Underneath Felt","Above Felt","Fascia Sock","Gables","Pv Panel","Part L - 6a PV Panel","Roof tile"]],
   ["1st Fix",            ["Joiner Prefix","Electrician Prefix","Plumber Prefix","VCL","Joiner 1st Fix","Plumber 1st Fix","Electrician 1st Fix","Party Wall","Windows","Joiner Dropbacks","Part L - 2b Joist Insulation","Part L - 3a Eaves Insulation","Part L - 4a Windows","Part L - 4b Doors","Part L - 6a WWHR","Barratt","NHBC Preplaster"]],
   ["Plasterboard",       ["Boarder","Taper"]],
   ["2nd Fix",            ["Mistcoat","Joiner 2nd fix","Plumber 2nd fix","Electrician 2nd fix","wall tiler","Kitchen","Patcher"]],
@@ -842,6 +842,33 @@ function migrate(stages){
         bwf.plots.forEach(p => seqB(p.tasks, "Fire photo", SUBS, true));
       }
       localStorage.setItem("siteProgress.brickfp.v1", "1");
+      localStorage.setItem(STORE_KEY, JSON.stringify(stages));
+    }
+  }catch(e){}
+
+  /* one-time: Fire photo sub-tasks in Roof */
+  try{
+    if(!localStorage.getItem("siteProgress.rooffp.v1")){
+      const normR = n => (n || "").trim().toLowerCase();
+      const RSUBS = ["Underneath Felt","Above Felt","Fascia Sock","Gables"];
+      const seqR = (list, anchor, names, isTask) => {
+        const nameOf = x => isTask ? x.name : x;
+        let at = list.findIndex(x => normR(nameOf(x)) === normR(anchor));
+        if(at < 0) at = list.length - 1;
+        names.forEach(nm => {
+          const ex = list.findIndex(x => normR(nameOf(x)) === normR(nm));
+          if(ex >= 0){ at = ex; return; }
+          const item = isTask ? { id: uid(), name: nm, done: false, doneAt: null, due: null, note: "", noteOpen: false } : nm;
+          list.splice(at + 1, 0, item);
+          at = at + 1;
+        });
+      };
+      const roofS = stages.find(s2 => s2.progNo === 4);
+      if(roofS){
+        if(Array.isArray(roofS.preset)) seqR(roofS.preset, "Fire photo", RSUBS, false);
+        roofS.plots.forEach(p => seqR(p.tasks, "Fire photo", RSUBS, true));
+      }
+      localStorage.setItem("siteProgress.rooffp.v1", "1");
       localStorage.setItem(STORE_KEY, JSON.stringify(stages));
     }
   }catch(e){}
@@ -2403,7 +2430,8 @@ function exportPDF(){
 function isEvidenceTask(name){
   const n = (name || "").trim().toLowerCase();
   return n === "fire photo" || n.indexOf("part l") === 0 ||
-         n.indexOf("detached -") === 0 || n.indexOf("semi/terrace -") === 0;
+         n.indexOf("detached -") === 0 || n.indexOf("semi/terrace -") === 0 ||
+         n === "underneath felt" || n === "above felt" || n === "fascia sock" || n === "gables";
 }
 
 function exportEvidencePDF(){
