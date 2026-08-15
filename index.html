@@ -532,7 +532,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 37 · 15 Aug";
+const BUILD = "build 38 · 15 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -571,6 +571,8 @@ const SEED = [
   ["2nd Fix",            ["Mistcoat","Joiner 2nd fix","Plumber 2nd fix","Electrician 2nd fix","wall tiler","Kitchen","Patcher"]],
   ["Paint & Decoration", ["Painter"]],
   ["Finals",             ["Build clean","Part L - 3a Loft Insulation","Part L - 6a PV Invertor","Part L - 6a Boiler","Part L - 6c Fan Duct","Mastic","Joiner Final","Electrician Final","PV Commission","Plumber final","Flooring","Patcher final","Paint final","Appliances","Reclean","All Trade Snags","CML"]],
+  ["Apartment Fire Photo", ["External Fire Photo","Internal Fire Photo"], true],
+  ["Apartment Communal", ["Fire photo","Dry Riser","Riser Cupboards","1st Fix Joiner","MF Ceiling","1st Fix Electrical","1st Fix Plumbing","NHBC Inspection","Boarding","Taping","2nd Fix Joiner","2nd Fix Electrician","2nd Fix Plumber","Painting","Final Joiner","Final Electrical","Final Plumber","Flooring","Clean","Mastic"], true],
   ["General",            [], true, true],
 ];
 /* Canonical order of the nine programme flow stages -> progNo 1..9 */
@@ -587,7 +589,7 @@ const uid = () => "id" + (Date.now().toString(36)) + (uidCounter++).toString(36)
 
 function buildSeed(){
   let flowNo = 0;
-  return SEED.map(([name, preset, basic, list]) => ({
+  const stages = SEED.map(([name, preset, basic, list]) => ({
     id: uid(),
     name,
     open: false,
@@ -602,6 +604,12 @@ function buildSeed(){
       tasks: preset.map(t => ({ id: uid(), name: t, done: false, doneAt: null, due: null, note: "", noteOpen: false }))
     }))
   }));
+  const ac = stages.find(st => st.name === "Apartment Communal");
+  if(ac) ac.plots = [700, 701].map(n => ({
+    id: uid(), name: "Plot " + n, open: false, prog: null,
+    tasks: ac.preset.map(t => ({ id: uid(), name: t, done: false, doneAt: null, due: null, note: "", noteOpen: false }))
+  }));
+  return stages;
 }
 
 /* Build a fresh task list for a plot from a stage's preset.
@@ -869,6 +877,33 @@ function migrate(stages){
         roofS.plots.forEach(p => seqR(p.tasks, "Fire photo", RSUBS, true));
       }
       localStorage.setItem("siteProgress.rooffp.v1", "1");
+      localStorage.setItem(STORE_KEY, JSON.stringify(stages));
+    }
+  }catch(e){}
+
+  /* one-time: apartment headers under Finals */
+  try{
+    if(!localStorage.getItem("siteProgress.apartments.v1")){
+      const normA = n => (n || "").trim().toLowerCase();
+      const mkTask = nm => ({ id: uid(), name: nm, done: false, doneAt: null, due: null, note: "", noteOpen: false });
+      let at = stages.findIndex(s2 => s2.progNo === 9);
+      if(at < 0) at = stages.length - 1;
+      if(!stages.some(s2 => normA(s2.name) === "apartment fire photo")){
+        stages.splice(at + 1, 0, {
+          id: uid(), name: "Apartment Fire Photo", open: false, basic: true, progNo: null,
+          preset: PRESETS["Apartment Fire Photo"].slice(), plots: []
+        });
+        at = at + 1;
+      }
+      if(!stages.some(s2 => normA(s2.name) === "apartment communal")){
+        const pre = PRESETS["Apartment Communal"].slice();
+        stages.splice(at + 1, 0, {
+          id: uid(), name: "Apartment Communal", open: false, basic: true, progNo: null,
+          preset: pre.slice(),
+          plots: [700, 701].map(n => ({ id: uid(), name: "Plot " + n, open: false, prog: null, tasks: pre.map(mkTask) }))
+        });
+      }
+      localStorage.setItem("siteProgress.apartments.v1", "1");
       localStorage.setItem(STORE_KEY, JSON.stringify(stages));
     }
   }catch(e){}
@@ -2431,7 +2466,8 @@ function isEvidenceTask(name){
   const n = (name || "").trim().toLowerCase();
   return n === "fire photo" || n.indexOf("part l") === 0 ||
          n.indexOf("detached -") === 0 || n.indexOf("semi/terrace -") === 0 ||
-         n === "underneath felt" || n === "above felt" || n === "fascia sock" || n === "gables";
+         n === "underneath felt" || n === "above felt" || n === "fascia sock" || n === "gables" ||
+         n === "external fire photo" || n === "internal fire photo";
 }
 
 function exportEvidencePDF(){
