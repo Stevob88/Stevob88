@@ -532,7 +532,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 39 · 15 Aug";
+const BUILD = "build 40 · 15 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -2250,11 +2250,13 @@ function exportPDF(){
   doc.setFont("helvetica","bold");
   doc.setFontSize(18);
   doc.setTextColor(30,58,58);
-  doc.text("Site Progress", marginX, y);
+  const spTitle = "Site Progress";
+  doc.text(spTitle, marginX, y);
+  const spTitleW = doc.getTextWidth(spTitle);
   doc.setFont("helvetica","normal");
   doc.setFontSize(10);
   doc.setTextColor(91,115,115);
-  doc.text(dateStr, marginX + 130, y);
+  doc.text(dateStr, marginX + spTitleW + 16, y);
   doc.text("Overall: " + overallP + "%  (" + done + "/" + total + " tasks)", pageW - marginX, y, { align:"right" });
   y += 8;
   doc.setDrawColor(220,237,232);
@@ -2507,11 +2509,13 @@ function exportEvidencePDF(){
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
   doc.setTextColor(30, 58, 58);
-  doc.text("Fire Photo & Part L — Outstanding", marginX, y);
+  const evTitle = "Fire Photo & Part L — Outstanding";
+  doc.text(evTitle, marginX, y);
+  const evTitleW = doc.getTextWidth(evTitle);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.setTextColor(91, 115, 115);
-  doc.text(dStr, marginX + 260, y);
+  doc.text(dStr, marginX + evTitleW + 16, y);
   doc.text(items + " items across " + plotsN + " plots", pageW - marginX, y, { align: "right" });
   y += 8;
   doc.setDrawColor(220, 237, 232);
