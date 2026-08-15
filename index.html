@@ -532,7 +532,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 35 · 15 Aug";
+const BUILD = "build 36 · 15 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -564,7 +564,7 @@ const SEED = [
   ["Foundations",        ["Groundworker","Steel","NHBC Foundations","Concrete"]],
   ["Substructure",       ["Blockwork","drainage","NHBC Drainage","Block and Beam","Insulation","Part L - 1a Perimeter","Part L - 1b Doorway","Pour Slab","Soleplate","Part L - 1c Therm Edge","Splash","Scaff Matt"]],
   ["Superstructure",     ["Scaffold","Crane","Timberframe","Part L - 2a VCL Lap","Oregon Externals"]],
-  ["Brickwork",          ["Brickwork 1st Lift","Fire photo","NHBC Super Inspection","Brickwork 2nd Lift","Scaffold Adaption","Brickwork Eaves + Gable","Window Detape","Down Pipes","Scaffold Dismantle"], true],
+  ["Brickwork",          ["Brickwork 1st Lift","Fire photo","Detached - Eaves","Detached - Windows/Doors","Detached - Service Penetrations","Detached - Gables","Semi/Terrace - Party Wall","Semi/Terrace - Eaves","Semi/Terrace - Windows/Doors","Semi/Terrace - Penetration","Semi/Terrace - Gable","Semi/Terrace - Cladding","NHBC Super Inspection","Brickwork 2nd Lift","Scaffold Adaption","Brickwork Eaves + Gable","Window Detape","Down Pipes","Scaffold Dismantle"], true],
   ["Roof",               ["Felt & Batten","Fire photo","Pv Panel","Part L - 6a PV Panel","Roof tile"]],
   ["1st Fix",            ["Joiner Prefix","Electrician Prefix","Plumber Prefix","VCL","Joiner 1st Fix","Plumber 1st Fix","Electrician 1st Fix","Party Wall","Windows","Joiner Dropbacks","Part L - 2b Joist Insulation","Part L - 3a Eaves Insulation","Part L - 4a Windows","Part L - 4b Doors","Part L - 6a WWHR","Barratt","NHBC Preplaster"]],
   ["Plasterboard",       ["Boarder","Taper"]],
@@ -816,6 +816,35 @@ function migrate(stages){
       p.tasks = p.tasks.filter(t => t.done || !PB_STRIP.test((t.name || "").trim()));
     });
   }
+
+  /* one-time: Fire photo sub-tasks for detached and semi/terrace plots in Brickwork */
+  try{
+    if(!localStorage.getItem("siteProgress.brickfp.v1")){
+      const normB = n => (n || "").trim().toLowerCase();
+      const SUBS = ["Detached - Eaves","Detached - Windows/Doors","Detached - Service Penetrations","Detached - Gables",
+                    "Semi/Terrace - Party Wall","Semi/Terrace - Eaves","Semi/Terrace - Windows/Doors",
+                    "Semi/Terrace - Penetration","Semi/Terrace - Gable","Semi/Terrace - Cladding"];
+      const seqB = (list, anchor, names, isTask) => {
+        const nameOf = x => isTask ? x.name : x;
+        let at = list.findIndex(x => normB(nameOf(x)) === normB(anchor));
+        if(at < 0) at = list.length - 1;
+        names.forEach(nm => {
+          const ex = list.findIndex(x => normB(nameOf(x)) === normB(nm));
+          if(ex >= 0){ at = ex; return; }
+          const item = isTask ? { id: uid(), name: nm, done: false, doneAt: null, due: null, note: "", noteOpen: false } : nm;
+          list.splice(at + 1, 0, item);
+          at = at + 1;
+        });
+      };
+      const bwf = stages.find(s2 => s2.basic && normB(s2.name) === "brickwork");
+      if(bwf){
+        if(Array.isArray(bwf.preset)) seqB(bwf.preset, "Fire photo", SUBS, false);
+        bwf.plots.forEach(p => seqB(p.tasks, "Fire photo", SUBS, true));
+      }
+      localStorage.setItem("siteProgress.brickfp.v1", "1");
+      localStorage.setItem(STORE_KEY, JSON.stringify(stages));
+    }
+  }catch(e){}
 
   /* one-time: add the General task-list header at the very end */
   try{
@@ -2373,7 +2402,8 @@ function exportPDF(){
    ============================================================ */
 function isEvidenceTask(name){
   const n = (name || "").trim().toLowerCase();
-  return n === "fire photo" || n.indexOf("part l") === 0;
+  return n === "fire photo" || n.indexOf("part l") === 0 ||
+         n.indexOf("detached -") === 0 || n.indexOf("semi/terrace -") === 0;
 }
 
 function exportEvidencePDF(){
