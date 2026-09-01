@@ -532,7 +532,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 42 · 16 Aug";
+const BUILD = "build 43 · 1 Sep";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -1572,7 +1572,8 @@ function render(){
 
   const tag = document.createElement("div");
   tag.className = "build-tag";
-  tag.textContent = "Site Progress · " + BUILD;
+  tag.textContent = "Site Progress · " + BUILD + " — tap to check for update";
+  tag.onclick = () => { showToast("Checking for update…"); checkForUpdate(true); };
   app.appendChild(tag);
 
   const rr = document.createElement("div");
@@ -3096,26 +3097,34 @@ function importBackup(f){
   }).catch(err => { console.warn(err); showToast("That's not a Site Progress backup file"); });
 }
 
-/* ---- self-update: fetch a fresh copy of this page and reload if the build is newer ---- */
-function checkForUpdate(){
+/* ---- self-update: fetch a fresh copy of this page and reload if the build is newer ----
+   A unique ?upd= query on both the check and the reload defeats every cache in the
+   chain (iOS home-screen cache, GitHub edge, corporate/MDM proxies), which plain
+   cache:"reload" on location.href could not. */
+function checkForUpdate(manual){
   try{
-    if(location.protocol === "file:") return;
-    fetch(location.href, { cache: "reload" })
+    if(location.protocol === "file:"){ if(manual) showToast("You're on " + BUILD); return; }
+    const freshUrl = location.pathname + "?upd=" + Date.now();
+    fetch(freshUrl, { cache: "no-store" })
       .then(r => (r && r.ok) ? r.text() : null)
       .then(html => {
-        if(!html) return;
+        if(!html){ if(manual) showToast("Couldn't check — are you online?"); return; }
         const m = html.match(/const BUILD = "build (\d+)/);
         const cur = parseInt((BUILD.match(/build (\d+)/) || [0, 0])[1], 10);
-        if(!m || parseInt(m[1], 10) <= cur) return;
-        try{                                        /* avoid reload loops if an edge cache lags */
-          if(sessionStorage.getItem("siteProgress.updSeen") === m[1]) return;
-          sessionStorage.setItem("siteProgress.updSeen", m[1]);
+        if(!m || parseInt(m[1], 10) <= cur){
+          if(manual) showToast("You're up to date — " + BUILD);
+          return;
+        }
+        try{                       /* damp reload loops, but retry after 90s rather than never */
+          const seen = (sessionStorage.getItem("siteProgress.updSeen") || "").split(":");
+          if(!manual && seen[0] === m[1] && Date.now() - (+seen[1] || 0) < 90000) return;
+          sessionStorage.setItem("siteProgress.updSeen", m[1] + ":" + Date.now());
         }catch(e){}
         saveNow();
         showToast("Updating to build " + m[1] + "…");
-        setTimeout(() => location.reload(), 900);
+        setTimeout(() => { location.replace(location.pathname + "?upd=" + m[1] + "-" + Date.now()); }, 900);
       })
-      .catch(() => {});
+      .catch(() => { if(manual) showToast("Couldn't check — are you online?"); });
   }catch(e){}
 }
 let lastUpdCheck = Date.now();
@@ -3135,6 +3144,9 @@ document.getElementById("restore-file").onchange = e => {
   if(f) importBackup(f);
 };
 render();
+try{  /* tidy the cache-busting query left by a self-update reload */
+  if(location.search.indexOf("upd=") >= 0) history.replaceState(null, "", location.pathname);
+}catch(e){}
 checkForUpdate();
 </script>
 </body>
