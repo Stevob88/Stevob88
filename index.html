@@ -532,7 +532,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 41 · 15 Aug";
+const BUILD = "build 42 · 16 Aug";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -1355,21 +1355,24 @@ function applyProgram(parsed){
     const name = "Plot " + n;
     progNames.add(name);
     const prog = { house: rec.house || "", est: rec.est, current: rec.current, notStarted: !!rec.notStarted };
-    if(rec.completed){
+    const ex = existingByName[name];
+    if(ex){
+      /* dates only: a plot the app already has NEVER moves — the user moves
+         plots themself; ahead/behind chips show any gap to the programme */
+      ex.p.prog = prog;
+      newPlots[ex.si].push(ex.p);
+      return;
+    }
+    if(rec.completed){                 /* unknown to the app and already claimed to 9 */
       if(!completedNames.has(name)){
         const at = rec.act && rec.act[9] ? new Date(rec.act[9] + "T12:00:00").getTime() : Date.now();
         completed.push({ name: name, at: at, plot: null });
       }
       return;
     }
+    /* brand new to the app (first upload, or newly released) — place per programme */
     const cur = Math.min(Math.max(rec.current, 1), 9);
     const target = (idxByProgNo[cur] != null) ? idxByProgNo[cur] : firstFlowIdx;
-    const ex = existingByName[name];
-    if(ex && ex.si >= target){         /* app is level or ahead — keep position and ticks */
-      ex.p.prog = prog;
-      newPlots[ex.si].push(ex.p);
-      return;
-    }
     newPlots[target].push({ id: uid(), name: name, open: false, prog: prog, tasks: tasksFromStage(state[target]) });
   });
 
@@ -1404,7 +1407,7 @@ function bindProgram(){
       const msg = "Programme parsed:\n• " + c.total + " plots (" + c.completed + " complete, " +
         c.notStarted + " not started)\n• Weeks " + fmtDay(parsed.window[0]) + " – " + fmtDay(parsed.window[1]) +
         (firstTime ? "\n\nThis will REPLACE the current plots in the app." :
-                     "\n\nStages and claim dates will be updated. Your ticks are kept.") +
+                     "\n\nClaim dates will be updated — NO plots will be moved.") +
         "\n\nApply now?";
       if(confirm(msg)) applyProgram(parsed);
     }).catch(err => {
