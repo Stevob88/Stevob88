@@ -532,7 +532,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 44 · 12 Oct";
+const BUILD = "build 45 · 12 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -566,7 +566,7 @@ const SEED = [
   ["Superstructure",     ["Scaffold","Crane","Timberframe","Part L - 2a VCL Lap","Oregon Externals"]],
   ["Brickwork",          ["Brickwork 1st Lift","Fire photo","Detached - Eaves","Detached - Windows/Doors","Detached - Service Penetrations","Detached - Gables","Semi/Terrace - Party Wall","Semi/Terrace - Eaves","Semi/Terrace - Windows/Doors","Semi/Terrace - Penetration","Semi/Terrace - Gable","Semi/Terrace - Cladding","NHBC Super Inspection","Brickwork 2nd Lift","Scaffold Adaption","Brickwork Eaves + Gable","Window Detape","Down Pipes","Scaffold Dismantle"], true],
   ["Roof",               ["Felt & Batten","Fire photo","Underneath Felt","Above Felt","Fascia Sock","Gables","Pv Panel","Part L - 6a PV Panel","Roof tile"]],
-  ["1st Fix",            ["Joiner Prefix","Electrician Prefix","Plumber Prefix","VCL","Joiner 1st Fix","Plumber 1st Fix","Electrician 1st Fix","Party Wall","Windows","Joiner Dropbacks","Part L - 2b Joist Insulation","Part L - 3a Eaves Insulation","Part L - 4a Windows","Part L - 4b Doors","Part L - 6a WWHR","Barratt","NHBC Preplaster"]],
+  ["1st Fix",            ["Joiner Prefix","Electrician Prefix","Plumber Prefix","VCL","Party Wall","Windows","Stairs","Joiner 1st Fix","Plumber 1st Fix","Electrician 1st Fix","Joiner Dropbacks","Part L - 2b Joist Insulation","Part L - 3a Eaves Insulation","Part L - 4a Windows","Part L - 4b Doors","Part L - 6a WWHR","Barratt","NHBC Preplaster"]],
   ["Plasterboard",       ["Boarder","Taper"]],
   ["2nd Fix",            ["Mistcoat","Joiner 2nd fix","Plumber 2nd fix","Electrician 2nd fix","wall tiler","Kitchen","Patcher"]],
   ["Paint & Decoration", ["Painter"]],
@@ -904,6 +904,33 @@ function migrate(stages){
         });
       }
       localStorage.setItem("siteProgress.apartments.v1", "1");
+      localStorage.setItem(STORE_KEY, JSON.stringify(stages));
+    }
+  }catch(e){}
+
+  /* one-time: 1st Fix order — Party Wall, Windows, then new Stairs, all before Joiner 1st Fix.
+     Existing plots are reordered in place; ticks, dates and notes are kept. */
+  try{
+    if(!localStorage.getItem("siteProgress.firstfix.v1")){
+      const normF = n => (n || "").trim().toLowerCase();
+      const MOVE = ["Party Wall","Windows","Stairs"];
+      const reorder = (list, isTask) => {
+        const nameOf = x => isTask ? x.name : x;
+        const picked = MOVE.map(nm => {
+          const i = list.findIndex(x => normF(nameOf(x)) === normF(nm));
+          if(i >= 0) return list.splice(i, 1)[0];
+          return isTask ? { id: uid(), name: nm, done: false, doneAt: null, due: null, note: "", noteOpen: false } : nm;
+        });
+        let at = list.findIndex(x => normF(nameOf(x)) === "joiner 1st fix");
+        if(at < 0) at = list.length;
+        list.splice(at, 0, ...picked);
+      };
+      const ff = stages.find(s2 => s2.progNo === 5);
+      if(ff){
+        if(Array.isArray(ff.preset)) reorder(ff.preset, false);
+        ff.plots.forEach(p => reorder(p.tasks, true));
+      }
+      localStorage.setItem("siteProgress.firstfix.v1", "1");
       localStorage.setItem(STORE_KEY, JSON.stringify(stages));
     }
   }catch(e){}
