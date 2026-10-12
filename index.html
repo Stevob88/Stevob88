@@ -532,7 +532,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 43 · 1 Sep";
+const BUILD = "build 44 · 12 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -997,6 +997,12 @@ function completePlot(stage, plot){
   completed.push({ name: plot.name, at: nowMs(), plot: JSON.parse(JSON.stringify(plot)) });
   stage.plots = stage.plots.filter(p => p.id !== plot.id);
 }
+/* Keep a stage's plots in plot-number order (Plot 106, 107 … 131); names without a number go last */
+function sortPlots(plots){
+  const num = p => parseInt((p.name.match(/\d+/) || ["9999"])[0], 10);
+  return plots.sort((x, y) => num(x) - num(y));
+}
+
 function restorePlot(name){
   const idx = completed.findIndex(c => c.name === name);
   if(idx < 0) return;
@@ -1007,6 +1013,7 @@ function restorePlot(name){
   (p.tasks || []).forEach(t => { if(isCML(t.name)){ t.done = false; t.doneAt = null; } });
   unlogEvent(name, finals.name, "CML");
   finals.plots.push(p);
+  sortPlots(finals.plots);
   finals.open = true;
 }
 
@@ -1381,11 +1388,7 @@ function applyProgram(parsed){
     if(s.basic) return;
     s.plots.forEach(p => { if(!progNames.has(p.name)) newPlots[si].push(p); });
   });
-  newPlots.forEach(a => a.sort((x, y) => {
-    const nx = parseInt((x.name.match(/\d+/) || ["9999"])[0], 10);
-    const ny = parseInt((y.name.match(/\d+/) || ["9999"])[0], 10);
-    return nx - ny;
-  }));
+  newPlots.forEach(sortPlots);
   state.forEach((s, i) => { if(!s.basic) s.plots = newPlots[i]; });
 
   programData = { uploadedAt: Date.now(), window: parsed.window, counts: parsed.counts };
@@ -2084,6 +2087,7 @@ function movePlotToPrevStage(stage, plot){
   } else if(!existing.prog && plot.prog){
     existing.prog = plot.prog;
   }
+  sortPlots(prev.plots);
   prev.open = true;
   saveNow(); render();
   showToast('"' + plot.name + '" moved back to ' + prev.name);
@@ -2106,6 +2110,7 @@ function movePlotToNextStage(stage, plot){
   } else if(!existing.prog && plot.prog){
     existing.prog = plot.prog;
   }
+  sortPlots(next.plots);
 
   next.open = true;          /* reveal the destination so the move is visible */
   save(); render();
