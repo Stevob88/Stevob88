@@ -586,6 +586,9 @@
   .co-group{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-soft);margin:10px 4px 2px;}
   .co-item{padding:5px 0 0;}
   .co-hold{display:block;margin:8px 0 0 auto;}
+  .co-stage{display:flex;align-items:center;gap:8px;margin:16px 2px 8px;font-size:15px;font-weight:800;letter-spacing:-.3px;color:var(--ink);}
+  .co-stage .co-count{margin-left:auto;font-size:12px;font-weight:700;color:var(--ink-soft);}
+  .calloff-export + .co-stage{margin-top:4px;}
   .co-plot.open .chev{transform:rotate(90deg);}
   .dash-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
   .dash-chips .due-chip{margin:0;}
@@ -705,7 +708,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 56 · 17 Oct";
+const BUILD = "build 57 · 17 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -1398,7 +1401,6 @@ function calloffPlotNames(){
 function renderCallOffSection(){
   const names = calloffPlotNames();
   const open = names.filter(n => calloffs[n].some(i => !i.done));
-  const doneNames = names.filter(n => !calloffs[n].some(i => !i.done));
   let outstanding = 0, late = 0;
   open.forEach(n => calloffs[n].forEach(i => { if(!i.done){ outstanding++; if(calloffState(i) === "late") late++; } }));
 
@@ -1424,11 +1426,13 @@ function renderCallOffSection(){
   if(!names.length){
     body.appendChild(emptyNote("Nothing to call off yet. When a plot starts its S1, or moves into S2, 1st Fix or 2nd Fix, its materials appear here."));
   }
-  const drawPlot = n => {
-    const items = calloffs[n];
+  /* one card per plot per call-off stage, showing just that stage's materials */
+  const drawPlot = (n, set) => {
+    const items = calloffs[n].filter(i => i.trig === set.trig);
     const left = items.filter(i => !i.done);
+    const key = n + "|" + set.trig;
     const card = document.createElement("div");
-    card.className = "plot co-plot" + (calloffPlotsOpen.has(n) ? " open" : "");
+    card.className = "plot co-plot" + (calloffPlotsOpen.has(key) ? " open" : "");
     const h = document.createElement("div");
     h.className = "plot-head";
     const sNo = calloffPlotStage(n);
@@ -1437,18 +1441,17 @@ function renderCallOffSection(){
       '<span class="plot-name co-name">' + dashEsc(n) + '</span>' +
       '<span class="due-chip ' + worst + '">' + (left.length ? left.length + " to call off" : "All called off") + '</span>';
     h.onclick = () => {
-      if(calloffPlotsOpen.has(n)) calloffPlotsOpen.delete(n); else calloffPlotsOpen.add(n);
+      if(calloffPlotsOpen.has(key)) calloffPlotsOpen.delete(key); else calloffPlotsOpen.add(key);
       card.classList.toggle("open");
     };
     card.appendChild(h);
     const b = document.createElement("div");
     b.className = "plot-body";
-    CALLOFF_SETS.forEach(set => {
-      const its = items.filter(i => i.trig === set.trig);
-      if(!its.length) return;
+    {
+      const its = items;
       const g = document.createElement("div");
       g.className = "co-group";
-      g.textContent = "S" + set.trig + " · " + set.label + " · w/c " + fmtWc(its[0].wc);
+      g.textContent = "Due w/c " + fmtWc(its[0].wc);
       b.appendChild(g);
       its.forEach(it => {
         const row = document.createElement("div");
@@ -1475,11 +1478,11 @@ function renderCallOffSection(){
         row.appendChild(tick); row.appendChild(main);
         b.appendChild(row);
       });
-    });
+    }
     /* S1 list added because the programme's 1 week passed, but the plot hasn't actually started */
     const fnd = state.find(x => x.progNo === 1 && !x.basic);
     const fp = fnd && fnd.plots.find(x => x.name === n);
-    if(fp && plotCounts(fp).done === 0 && items.some(i => i.trig === 1) && !items.some(i => i.trig === 1 && i.done)){
+    if(set.trig === 1 && fp && plotCounts(fp).done === 0 && !items.some(i => i.done)){
       const hold = document.createElement("button");
       hold.className = "del-plot co-hold";
       hold.textContent = "Not started S1 yet — remove from call-off";
@@ -1495,14 +1498,34 @@ function renderCallOffSection(){
     card.appendChild(b);
     return card;
   };
-  open.forEach(n => body.appendChild(drawPlot(n)));
-  if(doneNames.length){
+  /* in stage sequence: S1 start, Substructure, 1st Fix, 2nd Fix — plots in number order in each */
+  const stageHead = (set, n, doneList) => {
+    const g = document.createElement("div");
+    g.className = "co-stage";
+    g.innerHTML = '<span class="pw-stage">S' + set.trig + '</span><span>' + dashEsc(set.label) + '</span>' +
+      '<span class="co-count">' + n + (doneList ? " done" : " plot" + (n === 1 ? "" : "s")) + '</span>';
+    return g;
+  };
+  let doneCount = 0;
+  CALLOFF_SETS.forEach(set => {
+    const ns = names.filter(n => calloffs[n].some(i => i.trig === set.trig && !i.done));
+    doneCount += names.filter(n => calloffs[n].some(i => i.trig === set.trig) && !calloffs[n].some(i => i.trig === set.trig && !i.done)).length;
+    if(!ns.length) return;
+    body.appendChild(stageHead(set, ns.length, false));
+    ns.forEach(n => body.appendChild(drawPlot(n, set)));
+  });
+  if(doneCount){
     const t = document.createElement("button");
     t.className = "add-btn add-task-btn";
-    t.textContent = (calloffShowDone ? "Hide" : "Show") + " fully called-off plots (" + doneNames.length + ")";
+    t.textContent = (calloffShowDone ? "Hide" : "Show") + " fully called-off (" + doneCount + ")";
     t.onclick = () => { calloffShowDone = !calloffShowDone; render(); };
     body.appendChild(t);
-    if(calloffShowDone) doneNames.forEach(n => body.appendChild(drawPlot(n)));
+    if(calloffShowDone) CALLOFF_SETS.forEach(set => {
+      const ns = names.filter(n => calloffs[n].some(i => i.trig === set.trig) && !calloffs[n].some(i => i.trig === set.trig && !i.done));
+      if(!ns.length) return;
+      body.appendChild(stageHead(set, ns.length, true));
+      ns.forEach(n => body.appendChild(drawPlot(n, set)));
+    });
   }
   el.appendChild(body);
   return el;
