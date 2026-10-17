@@ -567,6 +567,12 @@
   .plot-weeks .dk{animation:none;}
   .intro .plot-weeks .dk{animation:grow .8s var(--ease-out) both;}
   .plot-weeks .dash-val{min-width:0;font-size:11.5px;}
+  .pw-side{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;max-width:46%;}
+  .pw-now{font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:var(--blue-soft);color:var(--blue);
+    max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .pw-now::before{content:"Now · ";font-weight:600;opacity:.75;}
+  .pw-now.done{background:var(--green-soft);color:var(--green);}
+  .pw-now.done::before{content:"";}
   .dash-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
   .dash-chips .due-chip{margin:0;}
 
@@ -685,7 +691,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 48 · 17 Oct";
+const BUILD = "build 49 · 17 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -2147,8 +2153,12 @@ function renderPlot(stage, plot){
     const wr = document.createElement("div");
     wr.className = "plot-weeks";
     const scale = Math.max(1, wk.planned || 0, Math.ceil(wk.el || 0));
+    /* current stage of work = first unticked task on the checklist */
+    const nextTask = plot.tasks.find(t => !t.done && (t.name || "").trim());
+    const now = nextTask ? nextTask.name.trim() : (plot.tasks.length ? "Ready to move" : "");
     wr.innerHTML = weeksTrackHTML(wk, scale) +
-      '<span class="dash-val' + (wk.over ? ' bad' : '') + '">' + weeksLabel(wk) + '</span>';
+      '<span class="pw-side"><span class="dash-val' + (wk.over ? ' bad' : '') + '">' + weeksLabel(wk) + '</span>' +
+      (now ? '<span class="pw-now' + (nextTask ? '' : ' done') + '">' + dashEsc(now) + '</span>' : '') + '</span>';
     head.appendChild(wr);
   }
   head.onclick = () => {
