@@ -567,6 +567,8 @@
   .plot-weeks .dk{animation:none;}
   .intro .plot-weeks .dk{animation:grow .8s var(--ease-out) both;}
   .plot-weeks .dash-val{min-width:0;font-size:11.5px;}
+  .pw-stage{flex-shrink:0;font-size:11.5px;font-weight:800;color:#fff;background:var(--grad);border-radius:8px;
+    padding:3px 7px;letter-spacing:.2px;box-shadow:0 3px 8px rgba(61,90,254,.25);}
   .pw-side{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;max-width:46%;}
   .pw-now{font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:var(--blue-soft);color:var(--blue);
     max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -691,7 +693,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 49 · 17 Oct";
+const BUILD = "build 50 · 17 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -2156,7 +2158,8 @@ function renderPlot(stage, plot){
     /* current stage of work = first unticked task on the checklist */
     const nextTask = plot.tasks.find(t => !t.done && (t.name || "").trim());
     const now = nextTask ? nextTask.name.trim() : (plot.tasks.length ? "Ready to move" : "");
-    wr.innerHTML = weeksTrackHTML(wk, scale) +
+    wr.innerHTML = '<span class="pw-stage" title="' + dashEsc(stage.name) + '">S' + stage.progNo + '</span>' +
+      weeksTrackHTML(wk, scale) +
       '<span class="pw-side"><span class="dash-val' + (wk.over ? ' bad' : '') + '">' + weeksLabel(wk) + '</span>' +
       (now ? '<span class="pw-now' + (nextTask ? '' : ' done') + '">' + dashEsc(now) + '</span>' : '') + '</span>';
     head.appendChild(wr);
