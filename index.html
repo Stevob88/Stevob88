@@ -693,7 +693,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 50 · 17 Oct";
+const BUILD = "build 51 · 17 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -2156,8 +2156,9 @@ function renderPlot(stage, plot){
     wr.className = "plot-weeks";
     const scale = Math.max(1, wk.planned || 0, Math.ceil(wk.el || 0));
     /* current stage of work = first unticked task on the checklist */
-    const nextTask = plot.tasks.find(t => !t.done && (t.name || "").trim());
-    const now = nextTask ? nextTask.name.trim() : (plot.tasks.length ? "Ready to move" : "");
+    const ct = currentTask(plot);
+    const nextTask = ct && !ct.ready;
+    const now = ct ? ct.name : "";
     wr.innerHTML = '<span class="pw-stage" title="' + dashEsc(stage.name) + '">S' + stage.progNo + '</span>' +
       weeksTrackHTML(wk, scale) +
       '<span class="pw-side"><span class="dash-val' + (wk.over ? ' bad' : '') + '">' + weeksLabel(wk) + '</span>' +
@@ -2453,7 +2454,7 @@ function exportPDF(){
   const pageH = doc.internal.pageSize.getHeight();
   const marginX = 36;
   const marginBottom = 40;
-  const PLOT_W = 148;
+  const PLOT_W = 176;
   let y = 48;
 
   const today = new Date();
@@ -2466,23 +2467,23 @@ function exportPDF(){
   /* Title */
   doc.setFont("helvetica","bold");
   doc.setFontSize(18);
-  doc.setTextColor(30,58,58);
+  doc.setTextColor(14,20,51);
   const spTitle = "Site Progress";
   doc.text(spTitle, marginX, y);
   const spTitleW = doc.getTextWidth(spTitle);
   doc.setFont("helvetica","normal");
   doc.setFontSize(10);
-  doc.setTextColor(91,115,115);
+  doc.setTextColor(106,112,150);
   doc.text(dateStr, marginX + spTitleW + 16, y);
   doc.text("Overall: " + overallP + "%  (" + done + "/" + total + " tasks)", pageW - marginX, y, { align:"right" });
   y += 8;
-  doc.setDrawColor(220,237,232);
+  doc.setDrawColor(231,234,248);
   doc.setLineWidth(1);
   doc.line(marginX, y, pageW - marginX, y);
   y += 18;
 
   function drawTick(cx, cy){
-    doc.setDrawColor(51,168,125);
+    doc.setDrawColor(31,175,122);
     doc.setLineWidth(1.6);
     doc.line(cx - 4, cy, cx - 1.2, cy + 3.2);
     doc.line(cx - 1.2, cy + 3.2, cx + 4.4, cy - 3.6);
@@ -2493,26 +2494,146 @@ function exportPDF(){
     const ky = pageH - 16;
     let kx = marginX;
     const item = (fill, label) => {
-      doc.setDrawColor(170,190,185);
+      doc.setDrawColor(190,198,230);
       doc.setLineWidth(0.6);
       if(fill){ doc.setFillColor(fill[0], fill[1], fill[2]); doc.rect(kx, ky - 7, 12, 9, "FD"); }
       else doc.rect(kx, ky - 7, 12, 9, "S");
       kx += 17;
       doc.setFont("helvetica","normal");
       doc.setFontSize(7.5);
-      doc.setTextColor(91,115,115);
+      doc.setTextColor(106,112,150);
       doc.text(label, kx, ky);
       kx += doc.getTextWidth(label) + 18;
     };
-    item([228,245,238], "Ahead of programme");
+    item([227,247,238], "Ahead of programme");
     item(null,          "On track");
     item([251,228,228], "Behind programme");
     doc.setFont("helvetica","normal");
     doc.setFontSize(7.5);
-    doc.setTextColor(58,168,188);
+    doc.setTextColor(61,90,254);
     doc.text("12/9 = date the trade promised", kx + 6, ky);
   }
+  drawSummaryPage();
+  doc.addPage();
+  y = 48;
   drawKey();
+
+  /* ---------- page 1: site summary, same figures as the dashboard ---------- */
+  function drawSummaryPage(){
+    const S = siteSummary();
+    const fmt = d => d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    const innerW = pageW - 2 * marginX;
+
+    /* overall progress bar under the title */
+    doc.setFillColor(227,231,250);
+    doc.roundedRect(marginX, y, innerW, 6, 3, 3, "F");
+    if(overallP > 0){ doc.setFillColor(61,90,254); doc.roundedRect(marginX, y, Math.max(6, innerW * overallP / 100), 6, 3, 3, "F"); }
+    y += 22;
+
+    /* headline tiles */
+    const tiles = [
+      [String(S.allPlots.length), "Plots on site", false],
+      [String(S.claimsDue), "Claims due in 7 days", false],
+      [String(S.left(S.partL)), "Part L outstanding", S.left(S.partL) > 0],
+      [String(S.left(S.fire)), "Fire photos outstanding", S.left(S.fire) > 0]
+    ];
+    const gap = 12, tw = (innerW - gap * 3) / 4, th = 54;
+    tiles.forEach((t, i) => {
+      const tx = marginX + i * (tw + gap);
+      doc.setFillColor(242,244,255);
+      doc.roundedRect(tx, y, tw, th, 8, 8, "F");
+      doc.setFont("helvetica","bold");
+      doc.setFontSize(22);
+      if(t[2]) doc.setTextColor(210,60,78); else doc.setTextColor(14,20,51);
+      doc.text(t[0], tx + 14, y + 28);
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(106,112,150);
+      doc.text(t[1], tx + 14, y + 44);
+    });
+    y += th + 26;
+
+    const colW2 = (innerW - 30) / 2;
+    const LBL = 96, VAL = 52;
+    const top = y;
+
+    function heading(txt, sub, x){
+      doc.setFont("helvetica","bold");
+      doc.setFontSize(12);
+      doc.setTextColor(14,20,51);
+      doc.text(txt, x, y);
+      if(sub){
+        doc.setFont("helvetica","normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(106,112,150);
+        doc.text(sub, x, y + 11);
+        y += 11;
+      }
+      y += 12;
+    }
+    /* one bar row: light track = total, dark (or green) = value */
+    function barRow(x, label, sub, val, total, max, txt, dark, bad){
+      const bx = x + LBL, bw = colW2 - LBL - VAL;
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(8);
+      doc.setTextColor(14,20,51);
+      doc.text(doc.splitTextToSize(label, LBL - 6)[0], x, y + 6);
+      if(sub){ doc.setFontSize(6.5); doc.setTextColor(106,112,150); doc.text(sub, x, y + 13); }
+      doc.setFillColor(221,227,251);
+      doc.rect(bx, y, Math.max(1, bw * total / max), 8, "F");
+      if(val > 0){ doc.setFillColor(dark[0], dark[1], dark[2]); doc.rect(bx, y, bw * val / max, 8, "F"); }
+      doc.setFont("helvetica","bold");
+      doc.setFontSize(7.5);
+      if(bad) doc.setTextColor(210,60,78); else doc.setTextColor(106,112,150);
+      doc.text(txt, x + colW2, y + 6.5, { align: "right" });
+      y += sub ? 17 : 14;
+    }
+
+    /* left column: plots per stage, then claims this week */
+    let x = marginX;
+    heading("Plots in each stage", "Week " + fmt(S.wk0) + " – " + fmt(S.wk1), x);
+    const maxIn = Math.max(1, ...S.flows.map(st => st.plots.length));
+    S.flows.forEach(st => barRow(x, "S" + st.progNo + "  " + st.name, "", st.plots.length, maxIn, maxIn,
+                                 st.plots.length + (st.plots.length === 1 ? " plot" : " plots"), [61,90,254], false));
+    y += 12;
+    heading("Claims this week", "", x);
+    const roomL = Math.floor((pageH - marginBottom - y) / 11);
+    if(!S.claims.length){
+      doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(106,112,150);
+      doc.text("No claims due this week.", x, y + 4);
+    }
+    S.claims.slice(0, roomL - (S.claims.length > roomL ? 1 : 0)).forEach(c => {
+      const col = c.ci.st === "over" ? [210,60,78] : c.ci.st === "today" ? [180,120,26] : [61,90,254];
+      doc.setFillColor(col[0], col[1], col[2]);
+      doc.circle(x + 3, y + 1.5, 2.2, "F");
+      doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.setTextColor(14,20,51);
+      doc.text(c.p.name, x + 10, y + 4);
+      doc.setFont("helvetica","normal"); doc.setTextColor(col[0], col[1], col[2]);
+      doc.text(claimLabel(c.ci, c.st.progNo), x + 62, y + 4);
+      y += 11;
+    });
+    if(S.claims.length > roomL){
+      doc.setFont("helvetica","normal"); doc.setFontSize(7.5); doc.setTextColor(106,112,150);
+      doc.text("+ " + (S.claims.length - roomL + 1) + " more", x + 10, y + 4);
+    }
+
+    /* right column: Part L items, then Fire photos per stage */
+    y = top;
+    x = marginX + colW2 + 30;
+    heading("Part L outstanding", "Light = plots needing it · green = done", x);
+    const pl = S.partL, maxL = Math.max(1, ...pl.map(r => r.total));
+    if(!pl.length){ doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(106,112,150); doc.text("No Part L tasks on plots right now.", x, y + 4); y += 14; }
+    pl.forEach(r => { const lft = r.total - r.done;
+      barRow(x, r.label, r.sub, r.done, r.total, maxL, lft ? lft + " left" : "All done", [31,175,122], lft > 0); });
+    y += 12;
+    heading("Fire photos outstanding", "Per stage, all photo items", x);
+    const fs = {};
+    S.fire.forEach(r => { fs[r.sub] = fs[r.sub] || { done: 0, total: 0 }; fs[r.sub].done += r.done; fs[r.sub].total += r.total; });
+    const fk = Object.keys(fs), maxF = Math.max(1, ...fk.map(k => fs[k].total));
+    if(!fk.length){ doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(106,112,150); doc.text("No Fire photo tasks on plots right now.", x, y + 4); }
+    fk.forEach(k => { const lft = fs[k].total - fs[k].done;
+      if(y < pageH - marginBottom) barRow(x, k, "", fs[k].done, fs[k].total, maxF, lft ? lft + " left" : "All done", [31,175,122], lft > 0); });
+  }
 
   state.forEach(stage => {
     if(stage.list) return;
@@ -2538,14 +2659,14 @@ function exportPDF(){
     function stageHeader(contd){
       doc.setFont("helvetica","bold");
       doc.setFontSize(13);
-      doc.setTextColor(58,168,188);
+      doc.setTextColor(61,90,254);
       doc.text((stage.name || "Stage") + (contd ? " (cont.)" : ""), marginX, y);
       doc.setFont("helvetica","normal");
       doc.setFontSize(9);
-      doc.setTextColor(91,115,115);
+      doc.setTextColor(106,112,150);
       doc.text(sp + "%  (" + sc.done + "/" + sc.total + ")", pageW - marginX, y, { align:"right" });
       y += 6;
-      doc.setDrawColor(94,198,216);
+      doc.setDrawColor(61,90,254);
       doc.setLineWidth(1.4);
       doc.line(marginX, y, marginX + tableW, y);
       y += 4;
@@ -2553,14 +2674,14 @@ function exportPDF(){
       /* column header: "Plot" + vertical task names */
       doc.setFont("helvetica","normal");
       doc.setFontSize(7);
-      doc.setTextColor(60,80,80);
+      doc.setTextColor(60,66,100);
       doc.text("Plot", marginX + 4, y + headH - 5);
       cols.forEach((c, i) => {
         const cx = marginX + PLOT_W + i * colW + colW / 2 + 2;
         doc.text(c, cx, y + headH - 5, { angle: 90 });
       });
       /* header underline + column separators */
-      doc.setDrawColor(200,220,215);
+      doc.setDrawColor(225,229,245);
       doc.setLineWidth(0.7);
       doc.line(marginX, y + headH, marginX + tableW, y + headH);
       y += headH;
@@ -2586,14 +2707,14 @@ function exportPDF(){
       if(hasProg){
         const bits = [];
         const ahead = daysAhead(p, stage);
-        if(ahead > 0) bits.push({ t: ahead + "d ahead", c: [51,168,125] });
+        if(ahead > 0) bits.push({ t: ahead + "d ahead", c: [31,175,122] });
         const behind = daysBehind(p, stage);
         if(behind > 0) bits.push({ t: behind + "d behind", c: [194,83,83] });
         const due = p.prog.est && p.prog.est[String(stage.progNo)];
         if(due){
           const ci = claimInfo(due);
           bits.push({ t: claimLabel(ci, stage.progNo),
-                      c: ci.st === "over" ? [194,83,83] : (ci.st === "near" || ci.st === "today") ? [169,118,26] : [58,168,188] });
+                      c: ci.st === "over" ? [194,83,83] : (ci.st === "near" || ci.st === "today") ? [180,120,26] : [61,90,254] });
         }
         doc.setFont("helvetica","normal");
         doc.setFontSize(6.8);
@@ -2607,13 +2728,20 @@ function exportPDF(){
         });
         if(cur.length) lines.push(cur);
       }
-      const rowH = lines.length ? 22 + lines.length * 9 : 20;
+      /* weeks-in-stage bar + current task, as on the plot card in the app */
+      const wk = stageWeeks(p, stage);
+      const showWk = wk && (wk.planned != null || wk.el != null);
+      const ct = currentTask(p);
+      const linesY = 22;
+      const wkY = linesY + lines.length * 9 - 3;
+      const nowY = wkY + (showWk ? 12 : 3);
+      const rowH = 18 + lines.length * 9 + (showWk ? 12 : 0) + (ct ? 10 : 0) + 2;
       newPageIfNeeded(rowH, true);
 
       /* plot box highlight: green = ahead, red = behind or overdue claim */
       let tone = null;
       if(hasProg){
-        if(daysAhead(p, stage) > 0) tone = [228,245,238];
+        if(daysAhead(p, stage) > 0) tone = [227,247,238];
         else {
           const due2 = p.prog.est && p.prog.est[String(stage.progNo)];
           if(daysBehind(p, stage) > 0 || (due2 && claimInfo(due2).st === "over")) tone = [251,228,228];
@@ -2625,15 +2753,26 @@ function exportPDF(){
       }
 
       /* plot name + wrapped programme lines, all inside the plot cell */
+      let nameX = marginX + 4;
+      if(stage.progNo && !stage.basic){          /* stage badge, e.g. S5 */
+        doc.setFont("helvetica","bold");
+        doc.setFontSize(7);
+        const bt = "S" + stage.progNo, bw2 = doc.getTextWidth(bt) + 7;
+        doc.setFillColor(61,90,254);
+        doc.roundedRect(nameX, y + 5.5, bw2, 10, 2.5, 2.5, "F");
+        doc.setTextColor(255,255,255);
+        doc.text(bt, nameX + bw2 / 2, y + 12.6, { align: "center" });
+        nameX += bw2 + 5;
+      }
       doc.setFont("helvetica","bold");
       doc.setFontSize(10);
-      doc.setTextColor(30,58,58);
-      doc.text(p.name || "Plot", marginX + 4, y + 13);
+      doc.setTextColor(14,20,51);
+      doc.text(p.name || "Plot", nameX, y + 13.5);
       doc.setFont("helvetica","normal");
       doc.setFontSize(6.8);
       lines.forEach((ln, li) => {
         let bx = marginX + 4;
-        const ly = y + 22 + li * 9;
+        const ly = y + linesY + li * 9;
         ln.forEach((bit, bi) => {
           doc.setTextColor(bit.c[0], bit.c[1], bit.c[2]);
           const t2 = (bi ? " · " : "") + bit.t;
@@ -2641,6 +2780,36 @@ function exportPDF(){
           bx += doc.getTextWidth(t2);
         });
       });
+
+      if(showWk){
+        const scale = Math.max(1, wk.planned || 0, Math.ceil(wk.el || 0));
+        const bx = marginX + 4, bw = 96, by = y + wkY, unit = bw / scale;
+        if(wk.planned != null){ doc.setFillColor(221,227,251); doc.rect(bx, by, unit * Math.min(wk.planned, scale), 5, "F"); }
+        if(wk.el != null){
+          if(wk.over){ doc.setFillColor(224,72,90); doc.rect(bx, by, unit * Math.min(wk.el, scale), 5, "F"); }
+          const dk = Math.min(wk.over ? wk.planned : wk.el, scale);
+          if(dk > 0){ doc.setFillColor(61,90,254); doc.rect(bx, by, unit * dk, 5, "F"); }
+        }
+        doc.setDrawColor(255,255,255);
+        doc.setLineWidth(1);
+        for(let k = 1; k < scale; k++) doc.line(bx + unit * k, by - .5, bx + unit * k, by + 5.5);
+        doc.setFont("helvetica","bold");
+        doc.setFontSize(6.8);
+        if(wk.over) doc.setTextColor(210,60,78); else doc.setTextColor(106,112,150);
+        doc.text(weeksLabel(wk), bx + bw + 6, by + 4.6);
+      }
+      if(ct){
+        doc.setFont("helvetica","normal");
+        doc.setFontSize(6.8);
+        if(ct.ready){ doc.setTextColor(31,175,122); doc.text("Ready to move", marginX + 4, y + nowY + 5); }
+        else {
+          doc.setTextColor(106,112,150);
+          doc.text("Now:", marginX + 4, y + nowY + 5);
+          doc.setFont("helvetica","bold");
+          doc.setTextColor(61,90,254);
+          doc.text(doc.splitTextToSize(ct.name, PLOT_W - 30)[0], marginX + 22, y + nowY + 5);
+        }
+      }
 
       /* task cells: tick when done, otherwise the promised date if one is set */
       cols.forEach((c, i) => {
@@ -2650,8 +2819,8 @@ function exportPDF(){
         else if(t && t.due){
           const st = dueState(t);
           if(st === "over") doc.setTextColor(194,83,83);
-          else if(st === "today") doc.setTextColor(169,118,26);
-          else doc.setTextColor(58,168,188);
+          else if(st === "today") doc.setTextColor(180,120,26);
+          else doc.setTextColor(61,90,254);
           doc.setFont("helvetica","normal");
           doc.setFontSize(6.4);
           const dd = new Date(t.due + "T00:00:00");
@@ -2660,7 +2829,7 @@ function exportPDF(){
       });
 
       /* grid: row line + verticals */
-      doc.setDrawColor(210,228,222);
+      doc.setDrawColor(225,229,245);
       doc.setLineWidth(0.6);
       doc.line(marginX, y + rowH, marginX + tableW, y + rowH);
       doc.line(marginX + PLOT_W, y, marginX + PLOT_W, y + rowH);
@@ -3098,24 +3267,28 @@ function collectTasks(match, labelOf){
   return [...map.values()];
 }
 
-function renderDashboard(){
-  const body = document.getElementById("dash-body");
+/* Current stage of work on a plot = first unticked task; "Ready to move" once all ticked */
+function currentTask(plot){
+  const t = plot.tasks.find(x => !x.done && (x.name || "").trim());
+  return t ? { name: t.name.trim(), ready: false } : (plot.tasks.length ? { name: "Ready to move", ready: true } : null);
+}
+
+/* Everything the dashboard and the PDF summary show, worked out once */
+function siteSummary(){
   const flows = flowStages();
   const allPlots = [];
   flows.forEach(st => st.plots.forEach(p => allPlots.push({ p, st })));
-  const now = Date.now();
 
   /* week window: programme weeks run Sun–Sat */
   const wk0 = new Date(); wk0.setHours(0,0,0,0); wk0.setDate(wk0.getDate() - wk0.getDay());
   const wk1 = new Date(wk0); wk1.setDate(wk1.getDate() + 6);
-  const fmt = d => d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 
   const partL = collectTasks((st, n) => /^part l/i.test((n || "").trim()),
     (st, t) => ({ label: t.name.replace(/^part l\s*-\s*/i, ""), sub: st.name }));
   const fire = collectTasks(isFireTask, (st, t) => ({ label: t.name, sub: st.name }));
   const left = rows => rows.reduce((a, r) => a + r.total - r.done, 0);
 
-  /* claims due this week */
+  /* claims due (or just missed) this week */
   const claims = [];
   allPlots.forEach(({ p, st }) => {
     const due = p.prog && p.prog.est && p.prog.est[String(st.progNo)];
@@ -3124,6 +3297,14 @@ function renderDashboard(){
     if(ci.days >= -7 && ci.days <= 7) claims.push({ p, st, ci });
   });
   claims.sort((a, b) => a.ci.days - b.ci.days);
+  return { flows, allPlots, wk0, wk1, partL, fire, claims, left,
+           claimsDue: claims.filter(c => c.ci.days >= 0).length };
+}
+
+function renderDashboard(){
+  const body = document.getElementById("dash-body");
+  const { flows, allPlots, wk0, wk1, partL, fire, claims, left } = siteSummary();
+  const fmt = d => d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 
   let h = "";
   h += '<div class="dash-kpis">' +
