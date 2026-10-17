@@ -585,6 +585,7 @@
   .co-plot .plot-head .due-chip{margin:0;}
   .co-group{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-soft);margin:10px 4px 2px;}
   .co-item{padding:5px 0 0;}
+  .co-hold{display:block;margin:8px 0 0 auto;}
   .co-plot.open .chev{transform:rotate(90deg);}
   .dash-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
   .dash-chips .due-chip{margin:0;}
@@ -704,7 +705,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 55 · 17 Oct";
+const BUILD = "build 56 · 17 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -1152,6 +1153,7 @@ function normalize(stages){
       name: p.name || "Plot",
       open: !!p.open,
       prog: p.prog || null,
+      s1Hold: !!p.s1Hold,
       enteredAt: (typeof p.enteredAt === "number") ? p.enteredAt : null,
       tasks: (p.tasks || []).map(t => ({
         id: t.id || uid(),
@@ -1356,7 +1358,15 @@ function syncCallOffs(){
     const set = CALLOFF_SETS.find(c => c.trig === st.progNo);
     if(!set) return;
     st.plots.forEach(p => {
-      if(st.progNo === 1 && !plotStarted(p, st)) return;
+      if(st.progNo === 1 && !plotStarted(p, st)){
+        const list = calloffs[p.name];
+        if(list && list.some(i => i.trig === 1) && !list.some(i => i.trig === 1 && i.done)){
+          calloffs[p.name] = list.filter(i => i.trig !== 1);
+          if(!calloffs[p.name].length) delete calloffs[p.name];
+          changed = true;
+        }
+        return;
+      }
       const list = calloffs[p.name] = calloffs[p.name] || [];
       if(list.some(i => i.trig === set.trig)) return;
       let at = p.enteredAt || Date.now();
@@ -1466,6 +1476,22 @@ function renderCallOffSection(){
         b.appendChild(row);
       });
     });
+    /* S1 list added because the programme's 1 week passed, but the plot hasn't actually started */
+    const fnd = state.find(x => x.progNo === 1 && !x.basic);
+    const fp = fnd && fnd.plots.find(x => x.name === n);
+    if(fp && plotCounts(fp).done === 0 && items.some(i => i.trig === 1) && !items.some(i => i.trig === 1 && i.done)){
+      const hold = document.createElement("button");
+      hold.className = "del-plot co-hold";
+      hold.textContent = "Not started S1 yet — remove from call-off";
+      hold.onclick = e => {
+        e.stopPropagation();
+        if(!confirm(n + " hasn't started S1?\n\nIts call-off list is removed and comes back when you tick a Foundations task for it.")) return;
+        fp.s1Hold = true;
+        saveNow(); render();
+        showToast(n + " removed from call-off");
+      };
+      b.appendChild(hold);
+    }
     card.appendChild(b);
     return card;
   };
@@ -3598,6 +3624,7 @@ function currentTask(plot){
 function plotStarted(p, st){
   if(st.progNo !== 1) return true;
   if(plotCounts(p).done > 0) return true;
+  if(p.s1Hold) return false;            /* marked "not started yet" — waits for a Foundations tick */
   const s1 = p.prog && p.prog.est && p.prog.est["1"];
   return !!(s1 && s1 <= todayStr());
 }
@@ -3610,6 +3637,7 @@ function s1Countdown(p){
   const c = document.createElement("span");
   c.className = "due-chip grey";
   const w = Math.round(days / 7);
+  if(days < 0){ c.className = "due-chip over"; c.textContent = "S1 not started · was due w/c " + wc; return [c]; }
   c.textContent = days >= 7 ? "S1 starts in " + w + (w === 1 ? " wk" : " wks") + " · w/c " + wc
                             : "S1 starts in " + days + (days === 1 ? " day" : " days") + " · w/c " + wc;
   return [c];
@@ -3624,7 +3652,7 @@ function nextToStartS1(n){
       const s1 = p.prog.est["1"], days = daysBetween(t, s1);
       const wc = new Date(s1 + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" });
       return { p, s1, days, wks: Math.max(0, Math.round(days / 7)), wc,
-               label: days >= 7 ? Math.round(days / 7) + (Math.round(days / 7) === 1 ? " wk" : " wks") : days + (days === 1 ? " day" : " days") };
+               label: days < 0 ? "overdue" : days >= 7 ? Math.round(days / 7) + (Math.round(days / 7) === 1 ? " wk" : " wks") : days + (days === 1 ? " day" : " days") };
     })
     .sort((a, b) => {
       const num = q => parseInt((q.p.name.match(/\d+/) || ["9999"])[0], 10);
