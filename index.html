@@ -693,7 +693,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 51 · 17 Oct";
+const BUILD = "build 52 · 17 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -2592,9 +2592,9 @@ function exportPDF(){
     /* left column: plots per stage, then claims this week */
     let x = marginX;
     heading("Plots in each stage", "Week " + fmt(S.wk0) + " – " + fmt(S.wk1), x);
-    const maxIn = Math.max(1, ...S.flows.map(st => st.plots.length));
-    S.flows.forEach(st => barRow(x, "S" + st.progNo + "  " + st.name, "", st.plots.length, maxIn, maxIn,
-                                 st.plots.length + (st.plots.length === 1 ? " plot" : " plots"), [61,90,254], false));
+    const maxIn = Math.max(1, ...S.flows.map(st => activePlots(st).length));
+    S.flows.forEach(st => { const n = activePlots(st).length;
+      barRow(x, "S" + st.progNo + "  " + st.name, "", n, maxIn, maxIn, n + (n === 1 ? " plot" : " plots"), [61,90,254], false); });
     y += 12;
     heading("Claims this week", "", x);
     const roomL = Math.floor((pageH - marginBottom - y) / 11);
@@ -3273,11 +3273,21 @@ function currentTask(plot){
   return t ? { name: t.name.trim(), ready: false } : (plot.tasks.length ? { name: "Ready to move", ready: true } : null);
 }
 
+/* Foundations holds every released plot, started or not. A plot counts as on site there only
+   once it has passed its programme "1" (its S1 week has arrived) or has a task ticked. */
+function plotStarted(p, st){
+  if(st.progNo !== 1) return true;
+  if(plotCounts(p).done > 0) return true;
+  const s1 = p.prog && p.prog.est && p.prog.est["1"];
+  return !!(s1 && s1 <= todayStr());
+}
+function activePlots(st){ return st.plots.filter(p => plotStarted(p, st)); }
+
 /* Everything the dashboard and the PDF summary show, worked out once */
 function siteSummary(){
   const flows = flowStages();
   const allPlots = [];
-  flows.forEach(st => st.plots.forEach(p => allPlots.push({ p, st })));
+  flows.forEach(st => activePlots(st).forEach(p => allPlots.push({ p, st })));
 
   /* week window: programme weeks run Sun–Sat */
   const wk0 = new Date(); wk0.setHours(0,0,0,0); wk0.setDate(wk0.getDate() - wk0.getDay());
@@ -3314,16 +3324,16 @@ function renderDashboard(){
     '<div class="dash-kpi' + (left(fire) ? ' warn' : '') + '"><b>' + left(fire) + '</b><span>Fire photos outstanding</span></div></div>';
 
   /* 1. stages this week */
-  const maxIn = Math.max(1, ...flows.map(s => s.plots.length));
+  const maxIn = Math.max(1, ...flows.map(s => activePlots(s).length));
   h += '<div class="dash-card"><h3>Plots <em>||</em> Stage this week</h3>' +
        '<div class="dash-sub">Week ' + fmt(wk0) + ' – ' + fmt(wk1) + ' · tap a stage to see its plots</div>';
   h += flows.map(s => {
-    const n = s.plots.length;
+    const sp = activePlots(s), n = sp.length;
     return '<div class="dash-row' + (n ? ' tap' : '') + '" title="' + dashEsc(s.name + ': ' + n + ' plots') + '">' +
       '<div class="dash-lbl">' + dashEsc(s.name) + '</div>' +
       '<div class="dash-track"><div class="lt" style="width:100%"></div><div class="dk" style="width:' + (n / maxIn * 100) + '%"></div></div>' +
       '<div class="dash-val">' + n + (n === 1 ? ' plot' : ' plots') + '</div></div>' +
-      (n ? '<div class="dash-list">' + s.plots.map(p => '<span class="blue">' + dashEsc(p.name) + '</span>').join("") + '</div>' : '');
+      (n ? '<div class="dash-list">' + sp.map(p => '<span class="blue">' + dashEsc(p.name) + '</span>').join("") + '</div>' : '');
   }).join("");
   if(claims.length){
     h += '<div class="dash-group" style="margin-top:14px">Claims this week</div><div class="dash-chips">' +
