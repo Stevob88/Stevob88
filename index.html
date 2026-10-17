@@ -562,6 +562,11 @@
   .dash-empty{font-size:13.5px;color:var(--ink-soft);padding:6px 0;line-height:1.5;}
   .dash-group{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-soft);margin:12px 0 2px;}
   .dash-group:first-of-type{margin-top:0;}
+  .plot-weeks{flex-basis:100%;display:flex;align-items:center;gap:10px;padding-left:26px;}
+  .plot-weeks .dash-track{flex:1;height:10px;}
+  .plot-weeks .dk{animation:none;}
+  .intro .plot-weeks .dk{animation:grow .8s var(--ease-out) both;}
+  .plot-weeks .dash-val{min-width:0;font-size:11.5px;}
   .dash-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
   .dash-chips .due-chip{margin:0;}
 
@@ -680,7 +685,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 47 · 17 Oct";
+const BUILD = "build 48 · 17 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -2137,6 +2142,15 @@ function renderPlot(stage, plot){
     chips.forEach(c => cw.appendChild(c));
     head.appendChild(cw);
   }
+  const wk = stageWeeks(plot, stage);                   /* weeks-in-stage bar, same as the dashboard */
+  if(wk && (wk.planned != null || wk.el != null)){
+    const wr = document.createElement("div");
+    wr.className = "plot-weeks";
+    const scale = Math.max(1, wk.planned || 0, Math.ceil(wk.el || 0));
+    wr.innerHTML = weeksTrackHTML(wk, scale) +
+      '<span class="dash-val' + (wk.over ? ' bad' : '') + '">' + weeksLabel(wk) + '</span>';
+    head.appendChild(wr);
+  }
   head.onclick = () => {
     if(head.__swiped) return;              /* was a horizontal swipe — ignore the tap */
     plot.open = !plot.open; save(); el.classList.toggle("open", plot.open);
@@ -3007,6 +3021,31 @@ function stageEntry(plot, stage, win){
   return win ? win.start : null;
 }
 
+/* Weeks in stage for a plot: { planned (programme weeks or null), el (weeks in so far or null), over } */
+function stageWeeks(plot, stage){
+  if(!stage || stage.basic || !stage.progNo) return null;
+  const win = plannedStageWindow(plot, stage);
+  const ent = stageEntry(plot, stage, win);
+  const el = ent ? Math.max(0, (Date.now() - ent) / MS_WEEK) : null;
+  const planned = win ? win.weeks : null;
+  return { planned, el, over: planned != null && el != null && el > planned };
+}
+function weeksLabel(w){
+  if(!w || w.el == null) return "—";
+  return Math.floor(w.el) + (w.planned != null ? " of " + w.planned : "") + " wks";   /* whole weeks completed */
+}
+/* light bar = programme weeks, dark = weeks in so far, red = past programme, white ticks between weeks */
+function weeksTrackHTML(w, scale){
+  const pct = v => (Math.min(v, scale) / scale * 100) + "%";
+  let ticks = "";
+  for(let k = 1; k < scale; k++) ticks += '<div class="tickmark" style="left:calc(' + (k / scale * 100) + '% - 1px)"></div>';
+  return '<div class="dash-track">' +
+    (w.planned != null ? '<div class="lt" style="width:' + pct(w.planned) + '"></div>' : '') +
+    (w.el != null && w.over ? '<div class="dk over" style="width:' + pct(w.el) + '"></div>' : '') +
+    (w.el != null ? '<div class="dk" style="width:' + pct(w.over ? w.planned : w.el) + '"></div>' : '') +
+    ticks + '</div>';
+}
+
 function isFireTask(stage, name){
   const n = (name || "").trim();
   const sn = (stage.name || "").trim().toLowerCase();
@@ -3118,12 +3157,7 @@ function renderDashboard(){
   h += '</div>';
 
   /* 4. weeks in stage, per plot */
-  const rows = allPlots.map(({ p, st }) => {
-    const win = plannedStageWindow(p, st);
-    const ent = stageEntry(p, st, win);
-    const el = ent ? Math.max(0, (now - ent) / MS_WEEK) : null;
-    return { p, st, planned: win ? win.weeks : null, el };
-  });
+  const rows = allPlots.map(({ p, st }) => Object.assign({ p, st }, stageWeeks(p, st)));
   const scale = Math.min(16, Math.max(1, ...rows.map(r => Math.max(r.planned || 0, Math.ceil(r.el || 0)))));
   h += '<div class="dash-card"><h3>Plot <em>||</em> Weeks in stage</h3>' +
        '<div class="dash-sub">Light bar = weeks the programme gives the stage · dark = weeks the plot has been in it</div>' +
@@ -3137,22 +3171,12 @@ function renderDashboard(){
     let lastStage = null;
     rows.forEach(r => {
       if(r.st !== lastStage){ h += '<div class="dash-group">' + dashEsc(r.st.name) + '</div>'; lastStage = r.st; }
-      const pl = r.planned, el = r.el;
-      const over = pl != null && el != null && el > pl;
-      let ticks = "";
-      for(let w = 1; w < scale; w++) ticks += '<div class="tickmark" style="left:calc(' + (w / scale * 100) + '% - 1px)"></div>';
-      const wkIn = el != null ? Math.floor(el) : null;   /* whole weeks completed in the stage */
-      const val = el == null ? "—" : (wkIn + (pl != null ? " of " + pl : "") + " wks");
-      const tip = r.p.name + " · " + r.st.name + ": " + (el == null ? "no start date" : el.toFixed(1) + " weeks in") +
-                  (pl != null ? ", programme " + pl + " weeks" : ", no programme");
+      const tip = r.p.name + " · " + r.st.name + ": " + (r.el == null ? "no start date" : r.el.toFixed(1) + " weeks in") +
+                  (r.planned != null ? ", programme " + r.planned + " weeks" : ", no programme");
       h += '<div class="dash-row" title="' + dashEsc(tip) + '">' +
-        '<div class="dash-lbl">' + dashEsc(r.p.name) + (pl == null ? '<small>no programme</small>' : '') + '</div>' +
-        '<div class="dash-track">' +
-          (pl != null ? '<div class="lt" style="width:' + (Math.min(pl, scale) / scale * 100) + '%"></div>' : '') +
-          (el != null && over ? '<div class="dk over" style="width:' + (Math.min(el, scale) / scale * 100) + '%"></div>' : '') +
-          (el != null ? '<div class="dk" style="width:' + (Math.min(over ? pl : el, scale) / scale * 100) + '%"></div>' : '') +
-          ticks + '</div>' +
-        '<div class="dash-val' + (over ? ' bad' : '') + '">' + val + '</div></div>';
+        '<div class="dash-lbl">' + dashEsc(r.p.name) + (r.planned == null ? '<small>no programme</small>' : '') + '</div>' +
+        weeksTrackHTML(r, scale) +
+        '<div class="dash-val' + (r.over ? ' bad' : '') + '">' + weeksLabel(r) + '</div></div>';
     });
   } else h += '<div class="dash-empty">No plots in the programme stages yet.</div>';
   h += '</div>';
