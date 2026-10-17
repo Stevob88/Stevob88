@@ -693,7 +693,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 52 · 17 Oct";
+const BUILD = "build 53 · 17 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -2143,14 +2143,16 @@ function renderPlot(stage, plot){
 
   head.appendChild(nameInput);
   head.appendChild(frac);
-  const chips = progChips(plot, stage);                 /* ahead + claim chips on their own line */
+  /* Foundations plot that hasn't reached its programme "1" yet: only a countdown, nothing else */
+  const notYet = stage.progNo === 1 && !stage.basic && !plotStarted(plot, stage);
+  const chips = notYet ? s1Countdown(plot) : progChips(plot, stage);   /* ahead + claim chips on their own line */
   if(chips.length){
     const cw = document.createElement("div");
     cw.className = "plot-chips";
     chips.forEach(c => cw.appendChild(c));
     head.appendChild(cw);
   }
-  const wk = stageWeeks(plot, stage);                   /* weeks-in-stage bar, same as the dashboard */
+  const wk = notYet ? null : stageWeeks(plot, stage);   /* weeks-in-stage bar, same as the dashboard */
   if(wk && (wk.planned != null || wk.el != null)){
     const wr = document.createElement("div");
     wr.className = "plot-weeks";
@@ -3280,6 +3282,18 @@ function plotStarted(p, st){
   if(plotCounts(p).done > 0) return true;
   const s1 = p.prog && p.prog.est && p.prog.est["1"];
   return !!(s1 && s1 <= todayStr());
+}
+/* "S1 starts in 6 wks · w/c 22 Nov" chip for a Foundations plot still waiting for its 1 */
+function s1Countdown(p){
+  const s1 = p.prog && p.prog.est && p.prog.est["1"];
+  if(!s1) return [];
+  const days = daysBetween(todayStr(), s1);
+  const wc = new Date(s1 + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  const c = document.createElement("span");
+  c.className = "due-chip grey";
+  c.textContent = days >= 7 ? "S1 starts in " + Math.round(days / 7) + " wks · w/c " + wc
+                            : "S1 starts in " + days + (days === 1 ? " day" : " days") + " · w/c " + wc;
+  return [c];
 }
 function activePlots(st){ return st.plots.filter(p => plotStarted(p, st)); }
 
