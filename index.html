@@ -515,6 +515,56 @@
   .plan-zoom button:active{background:var(--blue-soft);}
   #plan-fit{font-size:14px;}
 
+  /* ---------- Dashboard ---------- */
+  #dash-btn{
+    margin-left:auto;flex-shrink:0;width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;
+    border:none;border-radius:50%;background:var(--grad);box-shadow:var(--glow);color:#fff;cursor:pointer;padding:0;
+    transition:transform .15s ease;
+  }
+  #dash-btn:active{transform:scale(.93);}
+  #dash-btn svg{width:17px;height:17px;}
+  #dash-btn ~ #plan-btn{margin-left:0;}
+  .dash-overlay{background:var(--bg);}
+  .dash-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px calc(env(safe-area-inset-bottom) + 30px);}
+  .dash-kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+  .dash-kpi{background:#fff;border-radius:18px;box-shadow:var(--shadow);padding:13px 14px;animation:rise .5s var(--ease-out) both;}
+  .dash-kpi b{display:block;font-size:26px;font-weight:800;letter-spacing:-.8px;line-height:1.1;}
+  .dash-kpi span{font-size:12px;font-weight:600;color:var(--ink-soft);}
+  .dash-kpi.warn b{color:#D23C4E;}
+  .dash-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 14px 14px;margin-bottom:14px;animation:rise .55s var(--ease-out) both;}
+  .dash-card h3{font-size:17px;font-weight:800;letter-spacing:-.4px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;}
+  .dash-card h3 em{font-style:normal;color:var(--blue);}
+  .dash-sub{font-size:12px;color:var(--ink-soft);margin:3px 0 12px;font-weight:500;}
+  .dash-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-soft);font-weight:600;margin:-4px 0 10px;}
+  .dash-legend i{display:inline-block;width:12px;height:8px;border-radius:3px;margin-right:5px;vertical-align:0;}
+  .dash-row{display:grid;grid-template-columns:112px 1fr auto;align-items:center;gap:10px;padding:6px 0;cursor:default;}
+  .dash-row.tap{cursor:pointer;}
+  .dash-lbl{font-size:13px;font-weight:600;line-height:1.2;color:var(--ink);overflow:hidden;}
+  .dash-lbl small{display:block;font-size:11px;font-weight:500;color:var(--ink-soft);}
+  .dash-track{position:relative;height:14px;}
+  .dash-track .lt, .dash-track .dk{position:absolute;left:0;top:0;bottom:0;border-radius:0 4px 4px 0;}
+  .dash-track .lt{background:#DDE3FB;}
+  .dash-track .dk{background:var(--blue);transform-origin:left;animation:grow .8s var(--ease-out) both;}
+  .dash-track .dk.over{background:#E0485A;}
+  .dash-track .dk.ok{background:var(--green);}
+  .dash-track .tickmark{position:absolute;top:-2px;bottom:-2px;width:2px;background:#fff;}
+  @keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  .dash-val{font-size:12px;font-weight:700;color:var(--ink-soft);white-space:nowrap;text-align:right;min-width:44px;}
+  .dash-val.bad{color:#D23C4E;}
+  .dash-axis{display:grid;grid-template-columns:112px 1fr auto;gap:10px;font-size:10.5px;font-weight:700;color:var(--ink-soft);margin-bottom:2px;}
+  .dash-axis .ax{position:relative;height:14px;}
+  .dash-axis .ax span{position:absolute;transform:translateX(-50%);white-space:nowrap;}
+  .dash-axis .pad{min-width:44px;}
+  .dash-list{grid-column:1 / -1;display:none;flex-wrap:wrap;gap:6px;padding:4px 0 6px;}
+  .dash-row.show + .dash-list{display:flex;}
+  .dash-list span{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:99px;background:#FDE6E9;color:#D23C4E;}
+  .dash-list span.blue{background:var(--blue-soft);color:var(--blue);}
+  .dash-empty{font-size:13.5px;color:var(--ink-soft);padding:6px 0;line-height:1.5;}
+  .dash-group{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-soft);margin:12px 0 2px;}
+  .dash-group:first-of-type{margin-top:0;}
+  .dash-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  .dash-chips .due-chip{margin:0;}
+
   @media (prefers-reduced-motion: reduce){
     *,*::before,*::after{animation:none !important;transition:none !important;}
   }
@@ -535,6 +585,9 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>
     </div>
     <h1>Site <span>Progress</span></h1>
+    <button id="dash-btn" aria-label="Dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+    </button>
     <button id="plan-btn" aria-label="Site layout plan">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14"/><path d="M15 6v14"/></svg>
       Plan
@@ -609,6 +662,16 @@
     <button id="plan-in" aria-label="Zoom in">+</button>
   </div>
 </div>
+<!-- Dashboard -->
+<div class="plan-overlay dash-overlay" id="dash-overlay" hidden>
+  <div class="plan-bar">
+    <button id="dash-close" aria-label="Close dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <span class="plan-title">Site <span style="color:var(--blue)">Dashboard</span></span>
+  </div>
+  <div class="dash-scroll" id="dash-body"></div>
+</div>
 <input type="file" id="plan-file" accept="application/pdf,.pdf" hidden />
 <input type="file" id="prog-file" accept="application/pdf,.pdf" hidden />
 <input type="file" id="restore-file" accept="application/json,.json" hidden />
@@ -617,7 +680,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 46 · 14 Oct";
+const BUILD = "build 47 · 17 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -1060,6 +1123,7 @@ function normalize(stages){
       name: p.name || "Plot",
       open: !!p.open,
       prog: p.prog || null,
+      enteredAt: (typeof p.enteredAt === "number") ? p.enteredAt : null,
       tasks: (p.tasks || []).map(t => ({
         id: t.id || uid(),
         name: t.name || "",
@@ -2011,7 +2075,7 @@ function attachTaskDeleteSwipe(row, holder, task){
 
 function plot_new(stage){
   const n = stage.plots.length + 1;
-  stage.plots.push({ id: uid(), name: "Plot " + n, open: true, tasks: tasksFromStage(stage) });
+  stage.plots.push({ id: uid(), name: "Plot " + n, open: true, enteredAt: nowMs(), tasks: tasksFromStage(stage) });
 }
 
 function renderPlot(stage, plot){
@@ -2199,7 +2263,7 @@ function movePlotToPrevStage(stage, plot){
   stage.plots = stage.plots.filter(p => p.id !== plot.id);
   const existing = prev.plots.find(p => p.name.trim().toLowerCase() === plot.name.trim().toLowerCase());
   if(!existing){
-    prev.plots.push({ id: uid(), name: plot.name, open: false, prog: plot.prog || null, tasks: tasksFromStage(prev) });
+    prev.plots.push({ id: uid(), name: plot.name, open: false, prog: plot.prog || null, enteredAt: nowMs(), tasks: tasksFromStage(prev) });
   } else if(!existing.prog && plot.prog){
     existing.prog = plot.prog;
   }
@@ -2222,7 +2286,7 @@ function movePlotToNextStage(stage, plot){
   const existing = next.plots.find(p => p.name.trim().toLowerCase() === plot.name.trim().toLowerCase());
   if(!existing){
     /* new to this stage — give it this stage's preset checklist (fresh/unticked) */
-    next.plots.push({ id: uid(), name: plot.name, open: false, prog: plot.prog || null, tasks: tasksFromStage(next) });
+    next.plots.push({ id: uid(), name: plot.name, open: false, prog: plot.prog || null, enteredAt: nowMs(), tasks: tasksFromStage(next) });
   } else if(!existing.prog && plot.prog){
     existing.prog = plot.prog;
   }
@@ -2899,6 +2963,8 @@ function planBind(){
 
   planEls.overlay && (planEls.close.onclick = closePlan);
   document.getElementById("plan-btn").onclick = openPlan;
+  document.getElementById("dash-btn").onclick = openDashboard;
+  document.getElementById("dash-close").onclick = closeDashboard;
   planEls.attach.onclick = () => planEls.file.click();
   planEls.file.onchange = onPlanFile;
   planEls.replace.onclick = planMenu;
@@ -2908,6 +2974,202 @@ function planBind(){
   planEls.out.onclick = () => zoomPlan(1 / 1.4);
   planEls.fit.onclick = () => { planScale = planFitScale; centrePlan(); applyPlanTransform(); };
   attachPlanGestures();
+}
+
+/* ============================================================
+   Dashboard — stages this week, Part L, Fire photos, weeks per plot
+   ============================================================ */
+const MS_WEEK = 7 * 86400000;
+function dashEsc(t){ return String(t).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c])); }
+function flowStages(){ return state.filter(s => !s.basic && s.progNo); }
+
+/* Planned length of a stage for a plot, from the programme: stage N is due in the week of
+   est[N]; it starts the week after the previous programmed stage. Returns { weeks, start } or null. */
+function plannedStageWindow(plot, stage){
+  const est = plot.prog && plot.prog.est;
+  if(!est || !est[String(stage.progNo)]) return null;
+  const due = new Date(est[String(stage.progNo)] + "T00:00:00").getTime();
+  for(let k = stage.progNo - 1; k >= 1; k--){
+    if(est[String(k)]){
+      const start = new Date(est[String(k)] + "T00:00:00").getTime() + MS_WEEK;
+      return { weeks: Math.max(1, Math.round((due + MS_WEEK - start) / MS_WEEK)), start };
+    }
+  }
+  return { weeks: 1, start: due };
+}
+
+/* When the plot came into this stage: the move date if recorded, else the first task
+   ticked there, else the programme's planned start. */
+function stageEntry(plot, stage, win){
+  if(plot.enteredAt) return plot.enteredAt;
+  const ev = (timeline[plot.name] || []).filter(e => e.stage === stage.name).map(e => e.at);
+  if(ev.length) return Math.min.apply(null, ev);
+  return win ? win.start : null;
+}
+
+function isFireTask(stage, name){
+  const n = (name || "").trim();
+  const sn = (stage.name || "").trim().toLowerCase();
+  if(/fire photo/i.test(n) || sn === "apartment fire photo") return true;
+  if(sn === "brickwork" && /^(detached|semi\/terrace) - /i.test(n)) return true;
+  if(stage.progNo === 4 && /^(underneath felt|above felt|fascia sock|gables)$/i.test(n)) return true;
+  return false;
+}
+
+/* rows: [{ key, label, sub, done, total, out: [names] }] -> HTML of light (total) / dark (done) bars */
+function dashTaskRows(rows){
+  const max = Math.max(1, ...rows.map(r => r.total));
+  return rows.map(r => {
+    const left = r.total - r.done;
+    return '<div class="dash-row' + (left ? ' tap' : '') + '" title="' + dashEsc(r.label + ': ' + r.done + ' of ' + r.total + ' done') + '">' +
+      '<div class="dash-lbl">' + dashEsc(r.label) + (r.sub ? '<small>' + dashEsc(r.sub) + '</small>' : '') + '</div>' +
+      '<div class="dash-track"><div class="lt" style="width:' + (r.total / max * 100) + '%"></div>' +
+      '<div class="dk ok" style="width:' + (r.done / max * 100) + '%"></div></div>' +
+      '<div class="dash-val' + (left ? ' bad' : '') + '">' + (left ? left + ' left' : 'All done') + '</div></div>' +
+      (left ? '<div class="dash-list">' + r.out.map(n => '<span>' + dashEsc(n) + '</span>').join("") + '</div>' : '');
+  }).join("");
+}
+
+function collectTasks(match, labelOf){
+  const map = new Map();
+  state.forEach(stage => {
+    if(stage.list) return;
+    stage.plots.forEach(p => p.tasks.forEach(t => {
+      if(!match(stage, t.name)) return;
+      const key = stage.name + "|" + t.name.trim().toLowerCase();
+      if(!map.has(key)) map.set(key, Object.assign({ key, done: 0, total: 0, out: [] }, labelOf(stage, t)));
+      const r = map.get(key);
+      r.total++;
+      if(t.done) r.done++; else r.out.push(p.name);
+    }));
+  });
+  return [...map.values()];
+}
+
+function renderDashboard(){
+  const body = document.getElementById("dash-body");
+  const flows = flowStages();
+  const allPlots = [];
+  flows.forEach(st => st.plots.forEach(p => allPlots.push({ p, st })));
+  const now = Date.now();
+
+  /* week window: programme weeks run Sun–Sat */
+  const wk0 = new Date(); wk0.setHours(0,0,0,0); wk0.setDate(wk0.getDate() - wk0.getDay());
+  const wk1 = new Date(wk0); wk1.setDate(wk1.getDate() + 6);
+  const fmt = d => d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+
+  const partL = collectTasks((st, n) => /^part l/i.test((n || "").trim()),
+    (st, t) => ({ label: t.name.replace(/^part l\s*-\s*/i, ""), sub: st.name }));
+  const fire = collectTasks(isFireTask, (st, t) => ({ label: t.name, sub: st.name }));
+  const left = rows => rows.reduce((a, r) => a + r.total - r.done, 0);
+
+  /* claims due this week */
+  const claims = [];
+  allPlots.forEach(({ p, st }) => {
+    const due = p.prog && p.prog.est && p.prog.est[String(st.progNo)];
+    if(!due) return;
+    const ci = claimInfo(due);
+    if(ci.days >= -7 && ci.days <= 7) claims.push({ p, st, ci });
+  });
+  claims.sort((a, b) => a.ci.days - b.ci.days);
+
+  let h = "";
+  h += '<div class="dash-kpis">' +
+    '<div class="dash-kpi"><b>' + allPlots.length + '</b><span>Plots on site</span></div>' +
+    '<div class="dash-kpi"><b>' + claims.filter(c => c.ci.days >= 0).length + '</b><span>Claims due in 7 days</span></div>' +
+    '<div class="dash-kpi' + (left(partL) ? ' warn' : '') + '"><b>' + left(partL) + '</b><span>Part L outstanding</span></div>' +
+    '<div class="dash-kpi' + (left(fire) ? ' warn' : '') + '"><b>' + left(fire) + '</b><span>Fire photos outstanding</span></div></div>';
+
+  /* 1. stages this week */
+  const maxIn = Math.max(1, ...flows.map(s => s.plots.length));
+  h += '<div class="dash-card"><h3>Plots <em>||</em> Stage this week</h3>' +
+       '<div class="dash-sub">Week ' + fmt(wk0) + ' – ' + fmt(wk1) + ' · tap a stage to see its plots</div>';
+  h += flows.map(s => {
+    const n = s.plots.length;
+    return '<div class="dash-row' + (n ? ' tap' : '') + '" title="' + dashEsc(s.name + ': ' + n + ' plots') + '">' +
+      '<div class="dash-lbl">' + dashEsc(s.name) + '</div>' +
+      '<div class="dash-track"><div class="lt" style="width:100%"></div><div class="dk" style="width:' + (n / maxIn * 100) + '%"></div></div>' +
+      '<div class="dash-val">' + n + (n === 1 ? ' plot' : ' plots') + '</div></div>' +
+      (n ? '<div class="dash-list">' + s.plots.map(p => '<span class="blue">' + dashEsc(p.name) + '</span>').join("") + '</div>' : '');
+  }).join("");
+  if(claims.length){
+    h += '<div class="dash-group" style="margin-top:14px">Claims this week</div><div class="dash-chips">' +
+      claims.map(c => '<span class="due-chip ' + (c.ci.st === "over" ? "over" : c.ci.st === "today" ? "today" : "") + '">' +
+        dashEsc(c.p.name) + ' · ' + dashEsc(claimLabel(c.ci, c.st.progNo)) + '</span>').join("") + '</div>';
+  }
+  h += '</div>';
+
+  /* 2. Part L */
+  h += '<div class="dash-card"><h3>Part L <em>||</em> Outstanding</h3>' +
+       '<div class="dash-sub">Light bar = plots needing it · green = done · tap a row for the plots still to do</div>';
+  h += partL.length ? dashTaskRows(partL) : '<div class="dash-empty">No Part L tasks on plots right now.</div>';
+  h += '</div>';
+
+  /* 3. Fire photos, grouped by stage */
+  h += '<div class="dash-card"><h3>Fire photo <em>||</em> Outstanding</h3>' +
+       '<div class="dash-sub">Light bar = plots needing it · green = done · tap a row for the plots still to do</div>';
+  if(fire.length){
+    const groups = [...new Set(fire.map(r => r.sub))];
+    groups.forEach(g => {
+      h += '<div class="dash-group">' + dashEsc(g) + '</div>' +
+           dashTaskRows(fire.filter(r => r.sub === g).map(r => Object.assign({}, r, { sub: "" })));
+    });
+  } else h += '<div class="dash-empty">No Fire photo tasks on plots right now.</div>';
+  h += '</div>';
+
+  /* 4. weeks in stage, per plot */
+  const rows = allPlots.map(({ p, st }) => {
+    const win = plannedStageWindow(p, st);
+    const ent = stageEntry(p, st, win);
+    const el = ent ? Math.max(0, (now - ent) / MS_WEEK) : null;
+    return { p, st, planned: win ? win.weeks : null, el };
+  });
+  const scale = Math.min(16, Math.max(1, ...rows.map(r => Math.max(r.planned || 0, Math.ceil(r.el || 0)))));
+  h += '<div class="dash-card"><h3>Plot <em>||</em> Weeks in stage</h3>' +
+       '<div class="dash-sub">Light bar = weeks the programme gives the stage · dark = weeks the plot has been in it</div>' +
+       '<div class="dash-legend"><span><i style="background:#DDE3FB"></i>Programme weeks</span>' +
+       '<span><i style="background:var(--blue)"></i>Weeks in so far</span><span><i style="background:#E0485A"></i>Over programme</span></div>';
+  if(rows.length){
+    let ax = "";
+    const step = scale > 10 ? 2 : 1;
+    for(let w = step; w <= scale; w += step) ax += '<span style="left:' + ((w - .5) / scale * 100) + '%">Wk ' + w + '</span>';
+    h += '<div class="dash-axis"><div></div><div class="ax">' + ax + '</div><div class="pad"></div></div>';
+    let lastStage = null;
+    rows.forEach(r => {
+      if(r.st !== lastStage){ h += '<div class="dash-group">' + dashEsc(r.st.name) + '</div>'; lastStage = r.st; }
+      const pl = r.planned, el = r.el;
+      const over = pl != null && el != null && el > pl;
+      let ticks = "";
+      for(let w = 1; w < scale; w++) ticks += '<div class="tickmark" style="left:calc(' + (w / scale * 100) + '% - 1px)"></div>';
+      const wkIn = el != null ? Math.floor(el) : null;   /* whole weeks completed in the stage */
+      const val = el == null ? "—" : (wkIn + (pl != null ? " of " + pl : "") + " wks");
+      const tip = r.p.name + " · " + r.st.name + ": " + (el == null ? "no start date" : el.toFixed(1) + " weeks in") +
+                  (pl != null ? ", programme " + pl + " weeks" : ", no programme");
+      h += '<div class="dash-row" title="' + dashEsc(tip) + '">' +
+        '<div class="dash-lbl">' + dashEsc(r.p.name) + (pl == null ? '<small>no programme</small>' : '') + '</div>' +
+        '<div class="dash-track">' +
+          (pl != null ? '<div class="lt" style="width:' + (Math.min(pl, scale) / scale * 100) + '%"></div>' : '') +
+          (el != null && over ? '<div class="dk over" style="width:' + (Math.min(el, scale) / scale * 100) + '%"></div>' : '') +
+          (el != null ? '<div class="dk" style="width:' + (Math.min(over ? pl : el, scale) / scale * 100) + '%"></div>' : '') +
+          ticks + '</div>' +
+        '<div class="dash-val' + (over ? ' bad' : '') + '">' + val + '</div></div>';
+    });
+  } else h += '<div class="dash-empty">No plots in the programme stages yet.</div>';
+  h += '</div>';
+
+  body.innerHTML = h;
+  body.querySelectorAll(".dash-row.tap").forEach(r => r.onclick = () => r.classList.toggle("show"));
+}
+
+function openDashboard(){
+  renderDashboard();
+  document.getElementById("dash-overlay").hidden = false;
+  document.getElementById("dash-body").scrollTop = 0;
+  document.body.style.overflow = "hidden";
+}
+function closeDashboard(){
+  document.getElementById("dash-overlay").hidden = true;
+  document.body.style.overflow = "";
 }
 
 function openPlan(){
