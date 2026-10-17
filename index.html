@@ -576,6 +576,16 @@
   .pw-now::before{content:"Now · ";font-weight:600;opacity:.75;}
   .pw-now.done{background:var(--green-soft);color:var(--green);}
   .pw-now.done::before{content:"";}
+  .calloff-summary .summary-ico{color:#B4781A;background:#FDF1DC;}
+  .calloff-export{margin:0 0 12px;border-style:solid;border-color:transparent;background:var(--grad);color:#fff;box-shadow:var(--glow);border-radius:99px;padding:12px;}
+  .calloff-export:active{background:var(--grad);}
+  .co-plot .plot-head{flex-wrap:nowrap;}
+  .co-plot .pw-stage{margin-right:2px;}
+  .co-name{flex:1;min-width:0;}
+  .co-plot .plot-head .due-chip{margin:0;}
+  .co-group{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-soft);margin:10px 4px 2px;}
+  .co-item{padding:5px 0 0;}
+  .co-plot.open .chev{transform:rotate(90deg);}
   .dash-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
   .dash-chips .due-chip{margin:0;}
 
@@ -694,7 +704,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 54 · 17 Oct";
+const BUILD = "build 55 · 17 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -710,6 +720,8 @@ const ICON = {
   clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   medal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3l4 6 4-6"/><circle cx="12" cy="15" r="6"/><path d="M12 13v4M10 15h4"/></svg>',
   undo:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l-4-4 4-4"/><path d="M5 10h10a4 4 0 010 8h-3"/></svg>',
+  truck: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h11v10H3z"/><path d="M14 9h4l3 3v4h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>',
+  doc:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>',
   cal:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
   gantt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 5h8"/><path d="M7 10h10"/><path d="M11 15h8"/><path d="M3 20h18"/></svg>',
 };
@@ -789,12 +801,15 @@ const TIMELINE_KEY = "siteProgress.timeline.v1";   /* { plotName: [ {stage, task
 const COMPLETED_KEY = "siteProgress.completed.v1"; /* [ { name, at, plot } ] */
 const PROGRAM_KEY = "siteProgress.programMeta.v1"; /* { uploadedAt, window, counts } */
 const RESTORE_FLAG = "siteProgress.restoredMissing.v1";
+const CALLOFF_KEY = "siteProgress.calloffs.v1";   /* { plotName: [ {trig, name, wc, done, doneAt} ] } */
 
 let state = load();
 let timeline = loadJSON(TIMELINE_KEY, {});
 let completed = loadJSON(COMPLETED_KEY, []);
 let programData = loadJSON(PROGRAM_KEY, null);
-let completedOpen = false, logsOpen = false, dueOpen = false, progOpen = false;
+let calloffs = loadJSON(CALLOFF_KEY, {});
+let completedOpen = false, logsOpen = false, dueOpen = false, progOpen = false, calloffOpen = false, calloffShowDone = false;
+const calloffPlotsOpen = new Set();
 const logsExpanded = new Set();
 
 function loadJSON(key, dflt){
@@ -1161,6 +1176,7 @@ function saveNow(){
     localStorage.setItem(STORE_KEY, JSON.stringify(state));
     localStorage.setItem(TIMELINE_KEY, JSON.stringify(timeline));
     localStorage.setItem(COMPLETED_KEY, JSON.stringify(completed));
+    localStorage.setItem(CALLOFF_KEY, JSON.stringify(calloffs));
     if(programData) localStorage.setItem(PROGRAM_KEY, JSON.stringify(programData));
   }catch(e){ console.warn("save failed", e); }
 }
@@ -1314,6 +1330,285 @@ function renderDueSection(){
   }
   el.appendChild(body);
   return el;
+}
+
+/* ============================================================
+   Material call-off — materials to order when a plot reaches a stage
+   ============================================================ */
+const CALLOFF_SETS = [
+  { trig: 1, label: "Stage 1 start",     items: ["Timber Frame","Brick Special","Lintels","Cast Stone","Cavity Trays","GRP","External Doors","Stairs"] },
+  { trig: 2, label: "Into Substructure", items: ["Roof Lights","1st Fix Material"] },
+  { trig: 5, label: "Into 1st Fix",      items: ["2nd Fix Material","Final Ironmongery","Loft Hatch","Kitchen"] },
+  { trig: 7, label: "Into 2nd Fix",      items: ["Shower Screen","Garage Material"] }
+];
+function weekStartStr(ms){                     /* programme weeks run Sun–Sat: the Sunday on or before */
+  const d = new Date(ms); d.setHours(0,0,0,0); d.setDate(d.getDate() - d.getDay());
+  return dateStr(d);
+}
+function fmtWc(wc){ return new Date(wc + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" }); }
+
+/* Add a plot's call-off list when it is in a trigger stage (S1 only once it has started its 1).
+   Earlier stages' lists are never back-filled, so plots already further on aren't flooded. */
+function syncCallOffs(){
+  let changed = false;
+  state.forEach(st => {
+    if(st.basic || !st.progNo) return;
+    const set = CALLOFF_SETS.find(c => c.trig === st.progNo);
+    if(!set) return;
+    st.plots.forEach(p => {
+      if(st.progNo === 1 && !plotStarted(p, st)) return;
+      const list = calloffs[p.name] = calloffs[p.name] || [];
+      if(list.some(i => i.trig === set.trig)) return;
+      let at = p.enteredAt || Date.now();
+      const s1 = p.prog && p.prog.est && p.prog.est["1"];
+      if(st.progNo === 1 && s1 && s1 <= todayStr()) at = new Date(s1 + "T00:00:00").getTime();
+      const wc = weekStartStr(at);
+      set.items.forEach(name => list.push({ trig: set.trig, name, wc, done: false, doneAt: null }));
+      changed = true;
+    });
+  });
+  if(changed) save();
+}
+
+/* "late" = should have been called off in an earlier week, "now" = this week, "soon" = later */
+function calloffState(item){
+  if(item.done) return "done";
+  const wk = weekStartStr(Date.now());
+  return item.wc < wk ? "late" : item.wc === wk ? "now" : "soon";
+}
+function calloffPlotStage(name){
+  const st = state.find(s => !s.basic && s.progNo && s.plots.some(p => p.name === name));
+  return st ? st.progNo : null;
+}
+function calloffPlotNames(){
+  return Object.keys(calloffs).filter(n => calloffs[n].length)
+    .sort((a, b) => parseInt((a.match(/\d+/) || ["9999"])[0], 10) - parseInt((b.match(/\d+/) || ["9999"])[0], 10));
+}
+
+function renderCallOffSection(){
+  const names = calloffPlotNames();
+  const open = names.filter(n => calloffs[n].some(i => !i.done));
+  const doneNames = names.filter(n => !calloffs[n].some(i => !i.done));
+  let outstanding = 0, late = 0;
+  open.forEach(n => calloffs[n].forEach(i => { if(!i.done){ outstanding++; if(calloffState(i) === "late") late++; } }));
+
+  const el = document.createElement("div");
+  el.className = "stage summary calloff-summary" + (calloffOpen ? " open" : "");
+  const head = summaryHead("Material Call-Off", ICON.truck, outstanding, calloffOpen,
+    () => { calloffOpen = !calloffOpen; el.classList.toggle("open", calloffOpen); });
+  if(late){
+    const chip = head.querySelector(".chip");
+    chip.classList.add("alert");
+    chip.textContent = outstanding + " · " + late + " late";
+  }
+  el.appendChild(head);
+
+  const body = document.createElement("div");
+  body.className = "stage-body";
+  const exp = document.createElement("button");
+  exp.className = "add-btn calloff-export";
+  exp.innerHTML = ICON.doc + " Export this week's call-off PDF";
+  exp.onclick = exportCallOffPDF;
+  body.appendChild(exp);
+
+  if(!names.length){
+    body.appendChild(emptyNote("Nothing to call off yet. When a plot starts its S1, or moves into S2, 1st Fix or 2nd Fix, its materials appear here."));
+  }
+  const drawPlot = n => {
+    const items = calloffs[n];
+    const left = items.filter(i => !i.done);
+    const card = document.createElement("div");
+    card.className = "plot co-plot" + (calloffPlotsOpen.has(n) ? " open" : "");
+    const h = document.createElement("div");
+    h.className = "plot-head";
+    const sNo = calloffPlotStage(n);
+    const worst = left.some(i => calloffState(i) === "late") ? "over" : left.some(i => calloffState(i) === "now") ? "today" : left.length ? "" : "met";
+    h.innerHTML = ICON.chev + (sNo ? '<span class="pw-stage">S' + sNo + '</span>' : '') +
+      '<span class="plot-name co-name">' + dashEsc(n) + '</span>' +
+      '<span class="due-chip ' + worst + '">' + (left.length ? left.length + " to call off" : "All called off") + '</span>';
+    h.onclick = () => {
+      if(calloffPlotsOpen.has(n)) calloffPlotsOpen.delete(n); else calloffPlotsOpen.add(n);
+      card.classList.toggle("open");
+    };
+    card.appendChild(h);
+    const b = document.createElement("div");
+    b.className = "plot-body";
+    CALLOFF_SETS.forEach(set => {
+      const its = items.filter(i => i.trig === set.trig);
+      if(!its.length) return;
+      const g = document.createElement("div");
+      g.className = "co-group";
+      g.textContent = "S" + set.trig + " · " + set.label + " · w/c " + fmtWc(its[0].wc);
+      b.appendChild(g);
+      its.forEach(it => {
+        const row = document.createElement("div");
+        row.className = "task" + (it.done ? " checked" : "");
+        const tick = document.createElement("div");
+        tick.className = "tick" + (it.done ? " on" : "") + (it === calloffPop ? " pop" : "");
+        tick.innerHTML = ICON.check;
+        tick.setAttribute("role", "checkbox");
+        tick.setAttribute("aria-checked", it.done ? "true" : "false");
+        tick.onclick = () => {
+          it.done = !it.done; it.doneAt = it.done ? Date.now() : null;
+          calloffPop = it.done ? it : null;
+          saveNow(); render();
+        };
+        const main = document.createElement("div");
+        main.className = "task-main";
+        main.innerHTML = '<div class="task-name co-item">' + dashEsc(it.name) + '</div>';
+        const st = calloffState(it);
+        const chip = document.createElement("span");
+        chip.className = "due-chip " + (st === "done" ? "met" : st === "late" ? "over" : st === "now" ? "today" : "");
+        chip.textContent = st === "done" ? "Called off " + fmtWc(dateStr(new Date(it.doneAt))) :
+                           st === "late" ? "Was due w/c " + fmtWc(it.wc) : st === "now" ? "Call off this week" : "w/c " + fmtWc(it.wc);
+        main.appendChild(chip);
+        row.appendChild(tick); row.appendChild(main);
+        b.appendChild(row);
+      });
+    });
+    card.appendChild(b);
+    return card;
+  };
+  open.forEach(n => body.appendChild(drawPlot(n)));
+  if(doneNames.length){
+    const t = document.createElement("button");
+    t.className = "add-btn add-task-btn";
+    t.textContent = (calloffShowDone ? "Hide" : "Show") + " fully called-off plots (" + doneNames.length + ")";
+    t.onclick = () => { calloffShowDone = !calloffShowDone; render(); };
+    body.appendChild(t);
+    if(calloffShowDone) doneNames.forEach(n => body.appendChild(drawPlot(n)));
+  }
+  el.appendChild(body);
+  return el;
+}
+let calloffPop = null;
+
+/* Weekly call-off PDF: one table per trigger stage, materials as columns, a tick when called off */
+function exportCallOffPDF(){
+  const lib = window.jspdf;
+  if(!lib){ showToast("PDF library not loaded — check connection"); return; }
+  syncCallOffs();
+  const doc = new lib.jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
+  const pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight();
+  const marginX = 36, marginBottom = 40, PLOT_W = 150;
+  const wk = weekStartStr(Date.now());
+  const wkEnd = new Date(wk + "T00:00:00"); wkEnd.setDate(wkEnd.getDate() + 6);
+  const fmtLong = d => d.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+  let y = 48;
+
+  /* this week's list: anything due up to this week not yet called off, plus anything called off this week */
+  const inWeek = it => (!it.done && it.wc <= wk) || (it.done && it.doneAt && weekStartStr(it.doneAt) === wk);
+  let toDo = 0, doneWk = 0, lateN = 0;
+  Object.keys(calloffs).forEach(n => calloffs[n].forEach(it => {
+    if(!inWeek(it)) return;
+    if(it.done) doneWk++; else { toDo++; if(it.wc < wk) lateN++; }
+  }));
+
+  doc.setFont("helvetica","bold"); doc.setFontSize(18); doc.setTextColor(14,20,51);
+  doc.text("Material Call-Off", marginX, y);
+  const tW = doc.getTextWidth("Material Call-Off");
+  doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(106,112,150);
+  doc.text("Week commencing " + fmtLong(new Date(wk + "T00:00:00")) + " – " + wkEnd.toLocaleDateString(undefined, { day: "numeric", month: "short" }), marginX + tW + 16, y);
+  doc.text(toDo + " to call off" + (lateN ? " (" + lateN + " late)" : "") + "  ·  " + doneWk + " called off this week", pageW - marginX, y, { align: "right" });
+  y += 8;
+  doc.setDrawColor(231,234,248); doc.setLineWidth(1); doc.line(marginX, y, pageW - marginX, y);
+  y += 22;
+
+  const drawTick = (cx, cy) => {
+    doc.setDrawColor(31,175,122); doc.setLineWidth(1.6);
+    doc.line(cx - 4, cy, cx - 1.2, cy + 3.2); doc.line(cx - 1.2, cy + 3.2, cx + 4.4, cy - 3.6);
+  };
+  const drawKey = () => {
+    const ky = pageH - 16;
+    doc.setFont("helvetica","normal"); doc.setFontSize(7.5);
+    drawTick(marginX + 5, ky - 2.5);
+    doc.setTextColor(106,112,150); doc.text("Called off (date)", marginX + 14, ky);
+    doc.setTextColor(210,60,78); doc.text("LATE = should have been called off in an earlier week", marginX + 90, ky);
+    doc.setTextColor(180,120,26); doc.text("DUE = call off this week", marginX + 300, ky);
+  };
+  drawKey();
+
+  let any = false;
+  CALLOFF_SETS.forEach(set => {
+    const rows = calloffPlotNames().map(n => ({ n, its: calloffs[n].filter(i => i.trig === set.trig) }))
+      .filter(r => r.its.length && r.its.some(inWeek));
+    if(!rows.length) return;
+    any = true;
+    const cols = set.items;
+    const colW = Math.min(70, (pageW - 2 * marginX - PLOT_W) / cols.length);
+    const tableW = PLOT_W + colW * cols.length;
+    const headH = 30;
+
+    const header = contd => {
+      doc.setFont("helvetica","bold"); doc.setFontSize(13); doc.setTextColor(61,90,254);
+      doc.text("S" + set.trig + " · " + set.label + (contd ? " (cont.)" : ""), marginX, y);
+      y += 6;
+      doc.setDrawColor(61,90,254); doc.setLineWidth(1.4); doc.line(marginX, y, marginX + tableW, y);
+      y += 4;
+      doc.setFont("helvetica","bold"); doc.setFontSize(7.5); doc.setTextColor(60,66,100);
+      doc.text("Plot  ·  w/c", marginX + 4, y + headH - 9);
+      cols.forEach((c, i) => {
+        const cx = marginX + PLOT_W + i * colW + colW / 2;
+        doc.splitTextToSize(c, colW - 6).slice(0, 2).forEach((ln, li, arr) =>
+          doc.text(ln, cx, y + headH - 9 - (arr.length - 1 - li) * 8.5, { align: "center" }));
+      });
+      doc.setDrawColor(225,229,245); doc.setLineWidth(0.7); doc.line(marginX, y + headH, marginX + tableW, y + headH);
+      y += headH;
+    };
+    if(y + headH + 60 > pageH - marginBottom){ doc.addPage(); y = 48; drawKey(); }
+    header(false);
+
+    rows.forEach(r => {
+      const rowH = 30;
+      if(y + rowH > pageH - marginBottom){ doc.addPage(); y = 48; drawKey(); header(true); }
+      const wc = r.its[0].wc;
+      const late = r.its.some(i => !i.done && i.wc < wk);
+      if(late){ doc.setFillColor(251,228,228); doc.rect(marginX, y, PLOT_W, rowH, "F"); }
+      let nx = marginX + 4;
+      const sNo = calloffPlotStage(r.n);
+      if(sNo){
+        doc.setFont("helvetica","bold"); doc.setFontSize(7);
+        const bt = "S" + sNo, bw = doc.getTextWidth(bt) + 7;
+        doc.setFillColor(61,90,254); doc.roundedRect(nx, y + 5.5, bw, 10, 2.5, 2.5, "F");
+        doc.setTextColor(255,255,255); doc.text(bt, nx + bw / 2, y + 12.6, { align: "center" });
+        nx += bw + 5;
+      }
+      doc.setFont("helvetica","bold"); doc.setFontSize(10); doc.setTextColor(14,20,51);
+      doc.text(r.n, nx, y + 13.5);
+      doc.setFont("helvetica","normal"); doc.setFontSize(7);
+      if(late) doc.setTextColor(210,60,78); else doc.setTextColor(106,112,150);
+      doc.text("w/c " + fmtWc(wc) + (late ? "  ·  late" : ""), marginX + 4, y + 24);
+
+      cols.forEach((c, i) => {
+        const it = r.its.find(x => x.name === c);
+        const cx = marginX + PLOT_W + i * colW + colW / 2;
+        if(!it) return;
+        if(it.done){
+          drawTick(cx, y + 11);
+          doc.setFont("helvetica","normal"); doc.setFontSize(6.4); doc.setTextColor(106,112,150);
+          const dd = new Date(it.doneAt);
+          doc.text(dd.getDate() + "/" + (dd.getMonth() + 1), cx, y + 24, { align: "center" });
+        } else if(it.wc <= wk){
+          doc.setFont("helvetica","bold"); doc.setFontSize(7);
+          if(it.wc < wk) doc.setTextColor(210,60,78); else doc.setTextColor(180,120,26);
+          doc.text(it.wc < wk ? "LATE" : "DUE", cx, y + 17, { align: "center" });
+        }
+      });
+      doc.setDrawColor(225,229,245); doc.setLineWidth(0.6);
+      doc.line(marginX, y + rowH, marginX + tableW, y + rowH);
+      doc.line(marginX + PLOT_W, y, marginX + PLOT_W, y + rowH);
+      for(let i = 1; i <= cols.length; i++){ const vx = marginX + PLOT_W + i * colW; doc.line(vx, y, vx, y + rowH); }
+      y += rowH;
+    });
+    y += 22;
+  });
+  if(!any){
+    doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.setTextColor(106,112,150);
+    doc.text("Nothing to call off this week.", marginX, y);
+  }
+  const fd = new Date();
+  doc.save("Material-Call-Off-" + fd.getFullYear() + "-" + String(fd.getMonth() + 1).padStart(2, "0") + "-" + String(fd.getDate()).padStart(2, "0") + ".pdf");
+  showToast("Call-off PDF exported");
 }
 
 /* ============================================================
@@ -1747,9 +2042,11 @@ const app = document.getElementById("app");
 let popTaskId = null;
 
 function render(){
+  syncCallOffs();
   app.innerHTML = "";
   app.appendChild(renderProgSection());
   app.appendChild(renderDueSection());
+  app.appendChild(renderCallOffSection());
   state.forEach(stage => app.appendChild(renderStage(stage)));
 
   const addStage = document.createElement("button");
@@ -3740,7 +4037,7 @@ window.addEventListener("pagehide", saveNow);
    ============================================================ */
 function backupData(){
   return { kind: "site-progress-backup", version: 2, at: Date.now(),
-           state: state, timeline: timeline, completed: completed, programData: programData };
+           state: state, timeline: timeline, completed: completed, programData: programData, calloffs: calloffs };
 }
 function exportBackup(){
   saveNow();
@@ -3771,6 +4068,7 @@ function importBackup(f){
     timeline = d.timeline || {};
     completed = Array.isArray(d.completed) ? d.completed : [];
     programData = d.programData || null;
+    calloffs = d.calloffs || {};
     saveNow(); render();
     showToast("Backup restored");
   }).catch(err => { console.warn(err); showToast("That's not a Site Progress backup file"); });
