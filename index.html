@@ -551,6 +551,7 @@
   @keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
   .dash-val{font-size:12px;font-weight:700;color:var(--ink-soft);white-space:nowrap;text-align:right;min-width:44px;}
   .dash-val.bad{color:#D23C4E;}
+  .dash-val.soon{color:#B4781A;}
   .dash-axis{display:grid;grid-template-columns:112px 1fr auto;gap:10px;font-size:10.5px;font-weight:700;color:var(--ink-soft);margin-bottom:2px;}
   .dash-axis .ax{position:relative;height:14px;}
   .dash-axis .ax span{position:absolute;transform:translateX(-50%);white-space:nowrap;}
@@ -693,7 +694,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 53 · 17 Oct";
+const BUILD = "build 54 · 17 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -2598,6 +2599,26 @@ function exportPDF(){
     S.flows.forEach(st => { const n = activePlots(st).length;
       barRow(x, "S" + st.progNo + "  " + st.name, "", n, maxIn, maxIn, n + (n === 1 ? " plot" : " plots"), [61,90,254], false); });
     y += 12;
+    heading("Next to start S1", "The 10 plots closest to their programme 1", x);
+    if(!S.nextS1.length){
+      doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(106,112,150);
+      doc.text("No Foundations plots waiting on a programme 1.", x, y + 4); y += 14;
+    }
+    const mxS1 = Math.max(1, ...S.nextS1.map(r => r.wks));
+    S.nextS1.forEach(r => {
+      const bx = x + LBL, bw = colW2 - LBL - VAL;
+      doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.setTextColor(14,20,51);
+      doc.text(r.p.name, x, y + 6);
+      doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(106,112,150);
+      doc.text("w/c " + r.wc, x + 46, y + 6);
+      doc.setFillColor(221,227,251);
+      doc.rect(bx, y, bw * Math.max(r.wks, .25) / mxS1, 8, "F");
+      doc.setFont("helvetica","bold"); doc.setFontSize(7.5);
+      if(r.days < 7) doc.setTextColor(180,120,26); else doc.setTextColor(106,112,150);
+      doc.text(r.label, x + colW2, y + 6.5, { align: "right" });
+      y += 12;
+    });
+    y += 12;
     heading("Claims this week", "", x);
     const roomL = Math.floor((pageH - marginBottom - y) / 11);
     if(!S.claims.length){
@@ -3291,9 +3312,28 @@ function s1Countdown(p){
   const wc = new Date(s1 + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" });
   const c = document.createElement("span");
   c.className = "due-chip grey";
-  c.textContent = days >= 7 ? "S1 starts in " + Math.round(days / 7) + " wks · w/c " + wc
+  const w = Math.round(days / 7);
+  c.textContent = days >= 7 ? "S1 starts in " + w + (w === 1 ? " wk" : " wks") + " · w/c " + wc
                             : "S1 starts in " + days + (days === 1 ? " day" : " days") + " · w/c " + wc;
   return [c];
+}
+/* The n Foundations plots closest to reaching their programme "1": [{ p, s1, days, wks, label }] */
+function nextToStartS1(n){
+  const f = state.find(st => st.progNo === 1 && !st.basic);
+  if(!f) return [];
+  const t = todayStr();
+  return f.plots.filter(p => !plotStarted(p, f) && p.prog && p.prog.est && p.prog.est["1"])
+    .map(p => {
+      const s1 = p.prog.est["1"], days = daysBetween(t, s1);
+      const wc = new Date(s1 + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" });
+      return { p, s1, days, wks: Math.max(0, Math.round(days / 7)), wc,
+               label: days >= 7 ? Math.round(days / 7) + (Math.round(days / 7) === 1 ? " wk" : " wks") : days + (days === 1 ? " day" : " days") };
+    })
+    .sort((a, b) => {
+      const num = q => parseInt((q.p.name.match(/\d+/) || ["9999"])[0], 10);
+      return a.days - b.days || num(a) - num(b);      /* soonest first, then plot number */
+    })
+    .slice(0, n);
 }
 function activePlots(st){ return st.plots.filter(p => plotStarted(p, st)); }
 
@@ -3322,7 +3362,7 @@ function siteSummary(){
   });
   claims.sort((a, b) => a.ci.days - b.ci.days);
   return { flows, allPlots, wk0, wk1, partL, fire, claims, left,
-           claimsDue: claims.filter(c => c.ci.days >= 0).length };
+           claimsDue: claims.filter(c => c.ci.days >= 0).length, nextS1: nextToStartS1(10) };
 }
 
 function renderDashboard(){
@@ -3336,6 +3376,19 @@ function renderDashboard(){
     '<div class="dash-kpi"><b>' + claims.filter(c => c.ci.days >= 0).length + '</b><span>Claims due in 7 days</span></div>' +
     '<div class="dash-kpi' + (left(partL) ? ' warn' : '') + '"><b>' + left(partL) + '</b><span>Part L outstanding</span></div>' +
     '<div class="dash-kpi' + (left(fire) ? ' warn' : '') + '"><b>' + left(fire) + '</b><span>Fire photos outstanding</span></div></div>';
+
+  /* 0. next to start S1 — Foundations plots still waiting for their 1 */
+  const nx = siteSummary().nextS1;
+  h += '<div class="dash-card"><h3>Next <em>||</em> To start S1</h3>' +
+       '<div class="dash-sub">The 10 plots closest to their programme 1 · bar = weeks to go</div>';
+  if(nx.length){
+    const mx = Math.max(1, ...nx.map(r => r.wks));
+    h += nx.map(r => '<div class="dash-row" title="' + dashEsc(r.p.name + ': S1 week commencing ' + r.wc) + '">' +
+      '<div class="dash-lbl">' + dashEsc(r.p.name) + '<small>w/c ' + dashEsc(r.wc) + '</small></div>' +
+      '<div class="dash-track"><div class="lt" style="width:' + (Math.max(r.wks, .25) / mx * 100) + '%"></div></div>' +
+      '<div class="dash-val' + (r.days < 7 ? ' soon' : '') + '">' + r.label + '</div></div>').join("");
+  } else h += '<div class="dash-empty">No Foundations plots waiting on a programme 1 — upload the programme to see them.</div>';
+  h += '</div>';
 
   /* 1. stages this week */
   const maxIn = Math.max(1, ...flows.map(s => activePlots(s).length));
