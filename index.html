@@ -609,6 +609,16 @@
   .pi-k{flex:0 0 46%;color:var(--ink-soft);font-weight:600;}
   .pi-v{flex:1;min-width:0;color:var(--ink);font-weight:700;word-break:break-word;}
   .pi-v small{display:block;font-weight:500;color:var(--ink-soft);font-size:12px;margin-top:1px;}
+  .task .task-actions{gap:4px;}
+  .task .icon-btn{width:31px;height:31px;border-radius:10px;}
+  .task .icon-btn svg{width:16px;height:16px;}
+  .task{gap:8px;}
+  .todo-row .due-where{font-size:12.5px;color:var(--ink-soft);margin-top:1px;}
+  .icon-btn.todo-on{background:var(--green-light);border-color:var(--green-light);color:#fff;}
+  .todo-summary .summary-ico{color:var(--green);background:var(--green-soft);}
+  .todo-row .task-main{padding-top:2px;}
+  .todo-name{padding:2px 0 0;font-weight:700;}
+  .todo-note{font-size:12.5px;font-style:italic;color:var(--ink-soft);margin-top:3px;line-height:1.35;}
   .dash-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
   .dash-chips .due-chip{margin:0;}
 
@@ -698,7 +708,7 @@
     </button>
     <button id="comments-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 11h6"/></svg>
-      Comments
+      To-do &amp; Comments
     </button>
   </div>
   <button id="export-btn">
@@ -796,7 +806,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 64 · 18 Oct";
+const BUILD = "build 65 · 18 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -804,6 +814,7 @@ const BUILD = "build 64 · 18 Oct";
 const ICON = {
   chev:  '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>',
+  flag:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg>',
   note:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"/><path d="M4 10h16"/><path d="M4 15h9"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/><path d="M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13"/></svg>',
   plus:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>',
@@ -1256,7 +1267,8 @@ function normalize(stages){
         doneAt: (typeof t.doneAt === "number") ? t.doneAt : null,
         due: t.due || null,
         note: t.note || "",
-        noteOpen: !!t.noteOpen
+        noteOpen: !!t.noteOpen,
+        todo: (t.todo && typeof t.todo === "object" && Object.keys(t.todo).length) ? t.todo : undefined
       }))
     }))
   }));
@@ -2566,6 +2578,68 @@ async function onPlotInfoFile(e){
   }
 }
 
+/* ---- my to-do list: a flag on any task, kept per person so colleagues have their own ---- */
+function myId(){ return (typeof me !== "undefined" && me && me.user_id) ? me.user_id : "local"; }
+function isTodo(t){ return !!(t.todo && t.todo[myId()]); }
+function setTodo(t, on){
+  const id = myId();
+  if(on){ t.todo = Object.assign({}, t.todo || {}); t.todo[id] = Date.now(); }
+  else if(t.todo){ const o = Object.assign({}, t.todo); delete o[id]; t.todo = Object.keys(o).length ? o : undefined; }
+}
+function myTodos(){
+  const out = [];
+  state.forEach(stage => stage.plots.forEach(plot => plot.tasks.forEach(task => {
+    if(!task.done && isTodo(task)) out.push({ stage, plot, task, at: task.todo[myId()] });
+  })));
+  return out.sort((a, b) => (a.task.due || "9999") < (b.task.due || "9999") ? -1 : (a.task.due || "9999") > (b.task.due || "9999") ? 1 : a.at - b.at);
+}
+let todoOpen = false;
+function renderTodoSection(){
+  const rows = myTodos();
+  const el = document.createElement("div");
+  el.className = "stage summary todo-summary" + (todoOpen ? " open" : "");
+  const head = summaryHead("My To-Do List", ICON.flag, rows.length, todoOpen,
+    () => { todoOpen = !todoOpen; el.classList.toggle("open", todoOpen); });
+  el.appendChild(head);
+  const body = document.createElement("div");
+  body.className = "stage-body";
+  const exp = document.createElement("button");
+  exp.className = "add-btn calloff-export";
+  exp.innerHTML = ICON.doc + " Export to-do & comments PDF";
+  exp.onclick = exportCommentsPDF;
+  body.appendChild(exp);
+  if(!rows.length) body.appendChild(emptyNote("Nothing on your list. Tap the flag on any task to add it here — then tick it off when it's done, or export the list with your comments to print."));
+  rows.forEach(({ stage, plot, task }) => {
+    const row = document.createElement("div");
+    row.className = "task todo-row";
+    const tick = document.createElement("div");
+    tick.className = "tick";
+    tick.innerHTML = ICON.check;
+    tick.setAttribute("role", "checkbox");
+    tick.title = "Mark the task done";
+    tick.onclick = () => {
+      task.done = true; task.doneAt = nowMs(); delete task.todo;
+      logEvent(plot.name, stage.name, task.name, task.doneAt);
+      saveNow(); render(); showToast("Done — " + (task.name || "task"));
+    };
+    const main = document.createElement("div");
+    main.className = "task-main";
+    main.innerHTML = '<div class="task-name todo-name">' + dashEsc(task.name || "(unnamed task)") + '</div>' +
+      '<div class="due-where">' + dashEsc((stage.list ? "" : plotLabel(plot.name) + " · ") + stage.name) + '</div>' +
+      ((task.note || "").trim() ? '<div class="todo-note">' + dashEsc(task.note.trim()) + '</div>' : '');
+    if(task.due) main.appendChild(dueChip(task));
+    const rm = document.createElement("button");
+    rm.className = "icon-btn";
+    rm.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    rm.setAttribute("aria-label", "Remove from my to-do list");
+    rm.onclick = () => { setTodo(task, false); saveNow(); render(); };
+    row.appendChild(tick); row.appendChild(main); row.appendChild(rm);
+    body.appendChild(row);
+  });
+  el.appendChild(body);
+  return el;
+}
+
 /* task whose tick should play the pop animation on the next render */
 let popTaskId = null;
 
@@ -2573,6 +2647,7 @@ function render(){
   syncCallOffs();
   app.innerHTML = "";
   app.appendChild(renderProgSection());
+  app.appendChild(renderTodoSection());
   app.appendChild(renderDueSection());
   app.appendChild(renderCallOffSection());
   app.appendChild(renderPlotInfoSection());
@@ -3205,6 +3280,7 @@ function renderTask(stage, plot, task){
     popTaskId = task.done ? task.id : null;
     if(task.done){
       task.doneAt = nowMs();
+      delete task.todo;
       logEvent(plot.name, stage.name, task.name, task.doneAt);
       if(isCML(task.name) && !stage.basic && !stage.list){
         completePlot(stage, plot);
@@ -3294,6 +3370,18 @@ function renderTask(stage, plot, task){
     save(); render();
   };
 
+  const todoBtn = document.createElement("button");
+  todoBtn.className = "icon-btn todo-btn" + (isTodo(task) ? " todo-on" : "");
+  todoBtn.innerHTML = ICON.flag;
+  todoBtn.setAttribute("aria-label", isTodo(task) ? "Remove from my to-do list" : "Add to my to-do list");
+  todoBtn.onclick = () => {
+    const on = !isTodo(task);
+    setTodo(task, on);
+    saveNow(); render();
+    showToast(on ? "Added to your to-do list" : "Removed from your to-do list");
+  };
+
+  if(!task.done || isTodo(task)) actions.appendChild(todoBtn);   /* nothing to chase once it's done */
   actions.appendChild(noteBtn);
   actions.appendChild(dueBtn);
   actions.appendChild(delBtn);
@@ -3950,23 +4038,62 @@ function exportCommentsPDF(){
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(30, 39, 46);
-  doc.text("Comments — Action List", marginX, y);
+  doc.text("To-Do & Comments", marginX, y);
   y += 22;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   doc.setTextColor(94, 106, 117);
   doc.text(dStr, marginX, y);
-  doc.text(count + " comment" + (count === 1 ? "" : "s"), pageW - marginX, y, { align: "right" });
+  const todos = myTodos();
+  doc.text(todos.length + " to-do" + (todos.length === 1 ? "" : "s") + "  ·  " + count + " comment" + (count === 1 ? "" : "s"), pageW - marginX, y, { align: "right" });
   y += 12;
-  doc.setDrawColor(220, 237, 232);
+  doc.setDrawColor(226, 230, 236);
   doc.setLineWidth(1);
   doc.line(marginX, y, pageW - marginX, y);
   y += 22;
 
+  const sectionTitle = t => {
+    newPageIfNeeded(40);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor(30, 39, 46);
+    doc.text(t, marginX, y); y += 20;
+  };
+
+  /* 1. my to-do list, with a box to tick on paper */
+  sectionTitle("My to-do list" + (typeof me !== "undefined" && me && me.name ? " — " + me.name : ""));
+  if(!todos.length){
+    doc.setFont("helvetica", "normal"); doc.setFontSize(11); doc.setTextColor(94, 106, 117);
+    doc.text("Nothing on your to-do list.", marginX, y); y += 22;
+  }
+  todos.forEach(({ stage, plot, task }) => {
+    const noteTxt = (task.note || "").trim();
+    const noteLines = noteTxt ? doc.splitTextToSize(noteTxt, pageW - marginX * 2 - 24) : [];
+    newPageIfNeeded(32 + noteLines.length * 12.5);
+    doc.setDrawColor(150, 160, 170); doc.setLineWidth(1);
+    doc.rect(marginX, y - 9, 11, 11);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(30, 39, 46);
+    doc.text(task.name || "(unnamed task)", marginX + 20, y);
+    if(task.due){
+      const st = dueState(task);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+      if(st === "over") doc.setTextColor(210, 60, 78); else if(st === "today") doc.setTextColor(180, 120, 26); else doc.setTextColor(9, 132, 227);
+      doc.text("due " + fmtDay(task.due), pageW - marginX, y, { align: "right" });
+    }
+    y += 13;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(94, 106, 117);
+    doc.text((stage.list ? "" : plotLabel(plot.name) + "  ·  ") + stage.name, marginX + 20, y);
+    y += 12;
+    doc.setFont("helvetica", "italic"); doc.setFontSize(10); doc.setTextColor(60, 70, 80);
+    noteLines.forEach(line => { newPageIfNeeded(13); doc.text(line, marginX + 20, y); y += 12.5; });
+    y += 8;
+  });
+  y += 10;
+
+  /* 2. comments */
+  sectionTitle("Comments");
   if(!groups.length){
     doc.setFontSize(12);
     doc.setTextColor(0, 161, 157);
-    doc.text("No comments anywhere — nothing to action.", marginX, y);
+    doc.text("No comments anywhere.", marginX, y);
   }
 
   groups.forEach(g => {
@@ -3976,7 +4103,7 @@ function exportCommentsPDF(){
     doc.setTextColor(9, 132, 227);
     doc.text(g.stage.name || "Stage", marginX, y);
     y += 6;
-    doc.setDrawColor(94, 198, 216);
+    doc.setDrawColor(9, 132, 227);
     doc.setLineWidth(1.2);
     doc.line(marginX, y, pageW - marginX, y);
     y += 16;
@@ -3988,16 +4115,16 @@ function exportCommentsPDF(){
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
       doc.setTextColor(30, 39, 46);
-      const header = (g.stage.list ? "" : r.p.name + "  —  ") + (r.t.name || "(unnamed task)");
+      const header = (g.stage.list ? "" : plotLabel(r.p.name) + "  —  ") + (r.t.name || "(unnamed task)");
       doc.text(header, marginX, y);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
-      doc.setTextColor(r.t.done ? 51 : 169, r.t.done ? 168 : 118, r.t.done ? 125 : 26);
+      doc.setTextColor(r.t.done ? 0 : 180, r.t.done ? 161 : 120, r.t.done ? 157 : 26);
       doc.text(r.t.done ? "done" : "open", pageW - marginX, y, { align: "right" });
       y += 14;
       doc.setFont("helvetica", "italic");
       doc.setFontSize(10);
-      doc.setTextColor(80, 100, 100);
+      doc.setTextColor(60, 70, 80);
       noteLines.forEach(line => {
         newPageIfNeeded(13);
         doc.text(line, marginX + 24, y);
@@ -4008,8 +4135,8 @@ function exportCommentsPDF(){
     y += 8;
   });
 
-  doc.save("Site-Comments-" + fileDate + ".pdf");
-  showToast("Comments list exported");
+  doc.save("ToDo-and-Comments-" + fileDate + ".pdf");
+  showToast("To-do & comments exported");
 }
 
 /* ============================================================
