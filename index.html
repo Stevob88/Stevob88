@@ -794,7 +794,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 61 · 18 Oct";
+const BUILD = "build 62 · 18 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -1457,8 +1457,27 @@ function fmtWc(wc){ return new Date(wc + "T00:00:00").toLocaleDateString(undefin
 
 /* Add a plot's call-off list when it is in a trigger stage (S1 only once it has started its 1).
    Earlier stages' lists are never back-filled, so plots already further on aren't flooded. */
+/* Does this plot have a garage? From the plot schedule's garage code / size (integral garages count).
+   null = not known (no schedule, or plot not on it) — then garage items are kept. */
+function plotHasGarage(name){
+  const r = piRow(name);
+  if(!r) return null;
+  const code = piCol(/^garage code$/i), size = piCol(/^garage size$/i);
+  if(code < 0 && size < 0) return null;
+  const has = c => c >= 0 && r[c] && r[c] !== "-";
+  return has(code) || has(size);
+}
+const isGarageItem = name => /garage/i.test(name);
+function calloffApplies(plotName, itemName){ return !(isGarageItem(itemName) && plotHasGarage(plotName) === false); }
+
 function syncCallOffs(){
   let changed = false;
+  /* plots without a garage: drop garage call-offs not yet ticked */
+  Object.keys(calloffs).forEach(n => {
+    const before = calloffs[n].length;
+    calloffs[n] = calloffs[n].filter(i => i.done || calloffApplies(n, i.name));
+    if(calloffs[n].length !== before){ changed = true; if(!calloffs[n].length) delete calloffs[n]; }
+  });
   state.forEach(st => {
     if(st.basic || !st.progNo) return;
     const set = CALLOFF_SETS.find(c => c.trig === st.progNo);
@@ -1474,12 +1493,21 @@ function syncCallOffs(){
         return;
       }
       const list = calloffs[p.name] = calloffs[p.name] || [];
-      if(list.some(i => i.trig === set.trig)) return;
+      const have = list.filter(i => i.trig === set.trig);
+      if(have.length){
+        /* list already made: add an item that now applies (e.g. schedule shows a garage after all) */
+        set.items.forEach(name => {
+          if(calloffApplies(p.name, name) && !have.some(i => i.name === name)){
+            list.push({ trig: set.trig, name, wc: have[0].wc, done: false, doneAt: null }); changed = true;
+          }
+        });
+        return;
+      }
       let at = p.enteredAt || Date.now();
       const s1 = p.prog && p.prog.est && p.prog.est["1"];
       if(st.progNo === 1 && s1 && s1 <= todayStr()) at = new Date(s1 + "T00:00:00").getTime();
       const wc = weekStartStr(at);
-      set.items.forEach(name => list.push({ trig: set.trig, name, wc, done: false, doneAt: null }));
+      set.items.filter(name => calloffApplies(p.name, name)).forEach(name => list.push({ trig: set.trig, name, wc, done: false, doneAt: null }));
       changed = true;
     });
   });
@@ -1735,7 +1763,10 @@ function exportCallOffPDF(){
       cols.forEach((c, i) => {
         const it = r.its.find(x => x.name === c);
         const cx = marginX + PLOT_W + i * colW + colW / 2;
-        if(!it) return;
+        if(!it){
+          if(!calloffApplies(r.n, c)){ doc.setFont("helvetica","normal"); doc.setFontSize(6.5); doc.setTextColor(150,156,185); doc.text("No garage", cx, y + 17, { align: "center" }); }
+          return;
+        }
         if(it.done){
           drawTick(cx, y + 11);
           doc.setFont("helvetica","normal"); doc.setFontSize(6.4); doc.setTextColor(106,112,150);
