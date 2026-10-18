@@ -715,7 +715,7 @@
     <div class="plan-empty" id="plan-empty">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14"/><path d="M15 6v14"/></svg>
       <h3>No site plan attached</h3>
-      <p>Attach the site layout plan PDF once and it stays on this phone — open it any time to check plot numbers.</p>
+      <p>Attach the site layout plan PDF once and it appears on every signed-in device — open it any time to check plot numbers.</p>
       <button class="plan-attach" id="plan-attach">Attach site plan PDF</button>
     </div>
     <div class="plan-loading" id="plan-loading" hidden>Loading plan…</div>
@@ -770,7 +770,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 59 · 18 Oct";
+const BUILD = "build 60 · 18 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -3902,10 +3902,13 @@ function closePlan(){
 
 function planMenu(){
   if(!planDoc){ planEls.file.click(); return; }
-  if(confirm("Replace the site plan with a different PDF?\n\nTap Cancel to keep it, then use Remove below if you want it gone.")){
+  if(confirm("Replace the site plan with a different PDF?\n\nThe new plan replaces it on every device.\n\nTap Cancel to keep it, then use Remove below if you want it gone.")){
     planEls.file.click();
-  } else if(confirm("Remove the current site plan?")){
-    planDrop().then(() => { planDoc = null; showPlanEmpty(); showToast("Site plan removed"); });
+  } else if(confirm("Remove the current site plan from every device?")){
+    planDrop().then(() => {
+      planDoc = null; showPlanEmpty();
+      if(typeof planUnshare === "function" && syncReady) planUnshare(); else showToast("Site plan removed");
+    });
   }
 }
 
@@ -3917,8 +3920,11 @@ function onPlanFile(e){
   planEls.empty.hidden = true;
   planEls.loading.hidden = false;
   f.arrayBuffer()
-    .then(buf => planSave({ name: f.name, buf }).then(() => renderPlanFrom(buf, f.name)))
-    .then(() => showToast("Site plan saved to this phone"))
+    .then(buf => planSave({ name: f.name, buf, path: null }).then(() => renderPlanFrom(buf, f.name)).then(() => buf))
+    .then(buf => {
+      if(typeof planShare === "function" && syncReady) return planShare(buf, f.name);
+      showToast("Site plan saved to this phone");
+    })
     .catch(err => { console.warn(err); planEls.loading.hidden = true; showToast("Could not save that PDF"); });
 }
 
@@ -4525,10 +4531,79 @@ function syncSubscribe(){
     .on("postgres_changes", { event: "*", schema: "public", table: "docs" }, payload => {
       const k = (payload.new && payload.new.key) || (payload.old && payload.old.key);
       const v = payload.new && payload.new.version;
+      if(k === "plan"){ planSyncCheck(); return; }
       const base = syncMeta.base[k];
       if(k && !(base && base.version === v)) syncPull([k]);
     })
     .subscribe();
+}
+
+/* ---- site plan PDF shared through Supabase Storage; "plan" doc says which file is current ---- */
+const PLAN_BUCKET = "site-plan";
+async function planShare(buf, name){
+  showToast("Sharing site plan with the team…");
+  try{
+    const path = "plan-" + Date.now() + ".pdf";
+    const up = await sb.storage.from(PLAN_BUCKET).upload(path, new Blob([buf], { type: "application/pdf" }), { contentType: "application/pdf", upsert: true });
+    if(up.error) throw up.error;
+    const meta = { path, name, size: buf.byteLength, at: Date.now(), by: me ? (me.name || me.email) : "" };
+    const old = await setPlanDoc(meta);
+    await planSave({ name, buf, path });
+    if(old && old.path && old.path !== path) sb.storage.from(PLAN_BUCKET).remove([old.path]);
+    localStorage.removeItem("siteProgress.planPending");
+    showToast("Site plan shared — it will appear on every device");
+  }catch(e){
+    console.warn("plan share", e);
+    try{ localStorage.setItem("siteProgress.planPending", "1"); }catch(_){}
+    showToast("Saved on this phone — will share when you're online");
+  }
+}
+async function planUnshare(){
+  try{
+    const old = await setPlanDoc({ removed: true, at: Date.now() });
+    if(old && old.path) await sb.storage.from(PLAN_BUCKET).remove([old.path]);
+    showToast("Site plan removed for everyone");
+  }catch(e){ console.warn(e); showToast("Removed here — couldn't reach the server"); }
+}
+/* write the "plan" doc whatever its version; returns the previous value */
+async function setPlanDoc(value){
+  const { data: row } = await sb.from("docs").select("version,value").eq("key", "plan").maybeSingle();
+  const res = await sb.rpc("save_doc", { p_key: "plan", p_value: value, p_base: row ? row.version : 0 });
+  if(res.error) throw res.error;
+  if(!res.data.ok){                               /* someone changed it at the same moment: try once more */
+    const again = await sb.rpc("save_doc", { p_key: "plan", p_value: value, p_base: res.data.version });
+    if(again.error || !again.data.ok) throw again.error || new Error("plan save conflict");
+  }
+  return row ? row.value : null;
+}
+let planChecking = false;
+async function planSyncCheck(){
+  if(!syncReady || planChecking) return;
+  planChecking = true;
+  try{
+    const local = await planLoad().catch(() => null);
+    if(localStorage.getItem("siteProgress.planPending") && local && local.buf){ await planShare(local.buf, local.name); return; }
+    const { data: row, error } = await sb.from("docs").select("value").eq("key", "plan").maybeSingle();
+    if(error) return;
+    if(!row){                                     /* nothing shared yet: share the plan this device already has */
+      if(local && local.buf && !local.path) await planShare(local.buf, local.name);
+      return;
+    }
+    const meta = row.value || {};
+    if(meta.removed){
+      if(local){ await planDrop(); planDoc = null; if(!planEls.overlay.hidden) showPlanEmpty(); }
+      return;
+    }
+    if(!meta.path || (local && local.path === meta.path)) return;
+    const dl = await sb.storage.from(PLAN_BUCKET).download(meta.path);
+    if(dl.error) throw dl.error;
+    const buf = await dl.data.arrayBuffer();
+    await planSave({ name: meta.name, buf, path: meta.path });
+    if(planEls.overlay && !planEls.overlay.hidden) renderPlanFrom(buf, meta.name);
+    else planDoc = null;                          /* next open renders the new plan */
+    showToast("Site plan updated" + (meta.by ? " by " + meta.by : ""));
+  }catch(e){ console.warn("plan sync", e); }
+  finally{ planChecking = false; }
 }
 
 /* ---- sign-in screen ---- */
@@ -4597,6 +4672,7 @@ async function afterSignIn(){
   try{
     await syncFirst();
     syncSubscribe();
+    planSyncCheck();
   }catch(e){ console.warn(e); setSyncStatus("error"); }
 }
 
@@ -4626,7 +4702,7 @@ async function syncInit(){
   showAuth(setup ? "setup" : "signin");
 }
 
-window.addEventListener("online", () => { if(syncReady){ syncPull(); } });
+window.addEventListener("online", () => { if(syncReady){ syncPull(); planSyncCheck(); } });
 window.addEventListener("offline", () => { if(syncReady) setSyncStatus("offline"); });
 document.addEventListener("visibilitychange", () => { if(!document.hidden && syncReady) syncPull(); });
 setInterval(() => { if(syncReady && !document.hidden) syncPull(); }, 60000);
