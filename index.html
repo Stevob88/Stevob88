@@ -806,7 +806,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 65 · 18 Oct";
+const BUILD = "build 66 · 18 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -4111,26 +4111,35 @@ function exportCommentsPDF(){
     g.rows.forEach(r => {
       const noteTxt = (r.t.note || "").trim();
       const noteLines = noteTxt ? doc.splitTextToSize(noteTxt, pageW - marginX * 2 - 24) : [];
-      newPageIfNeeded(18 + noteLines.length * 12.5 + 8);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
-      doc.setTextColor(30, 39, 46);
       const header = (g.stage.list ? "" : plotLabel(r.p.name) + "  —  ") + (r.t.name || "(unnamed task)");
-      doc.text(header, marginX, y);
+      const headLines = doc.splitTextToSize(header, pageW - marginX * 2 - 20 - 40);
+      newPageIfNeeded(headLines.length * 13 + 5 + noteLines.length * 12.5 + 8);
+      /* tick box to mark on paper — already ticked if the task is done */
+      doc.setDrawColor(150, 160, 170); doc.setLineWidth(1);
+      doc.rect(marginX, y - 9, 11, 11);
+      if(r.t.done){
+        doc.setDrawColor(0, 161, 157); doc.setLineWidth(1.6);
+        doc.line(marginX + 2.3, y - 3.6, marginX + 4.6, y - 1.2);
+        doc.line(marginX + 4.6, y - 1.2, marginX + 9, y - 6.6);
+      }
+      doc.setTextColor(30, 39, 46);
+      headLines.forEach((ln, i) => doc.text(ln, marginX + 20, y + i * 13));
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
       doc.setTextColor(r.t.done ? 0 : 180, r.t.done ? 161 : 120, r.t.done ? 157 : 26);
       doc.text(r.t.done ? "done" : "open", pageW - marginX, y, { align: "right" });
-      y += 14;
+      y += (headLines.length - 1) * 13 + 14;
       doc.setFont("helvetica", "italic");
       doc.setFontSize(10);
       doc.setTextColor(60, 70, 80);
       noteLines.forEach(line => {
         newPageIfNeeded(13);
-        doc.text(line, marginX + 24, y);
+        doc.text(line, marginX + 20, y);
         y += 12.5;
       });
-      y += 8;
+      y += noteLines.length ? 8 : 4;
     });
     y += 8;
   });
