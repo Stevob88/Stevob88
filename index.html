@@ -593,6 +593,20 @@
   .co-stage .co-count{margin-left:auto;font-size:12px;font-weight:700;color:var(--ink-soft);}
   .calloff-export + .co-stage{margin-top:4px;}
   .co-plot.open .chev{transform:rotate(90deg);}
+  .ht-chip{display:inline-block;flex-shrink:0;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:99px;
+    background:#F0ECFF;color:#6A4BFF;white-space:nowrap;cursor:pointer;vertical-align:1px;}
+  .pinfo-summary .summary-ico{color:#6A4BFF;background:#F0ECFF;}
+  .pi-search{display:block;width:100%;padding:12px 14px;margin:0 0 10px;border:1.5px solid var(--line);border-radius:14px;
+    font-family:inherit;font-size:16px;color:var(--ink);background:#FAFBFF;}
+  .pi-search:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 4px rgba(61,90,254,.12);background:#fff;}
+  .pi-sum{display:block;font-size:11.5px;font-weight:600;color:var(--ink-soft);margin-top:2px;}
+  .pi-group{margin:8px 2px 12px;}
+  .pi-gt{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--blue);margin-bottom:4px;}
+  .pi-row{display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--line);font-size:13.5px;}
+  .pi-row:first-of-type{border-top:none;}
+  .pi-k{flex:0 0 46%;color:var(--ink-soft);font-weight:600;}
+  .pi-v{flex:1;min-width:0;color:var(--ink);font-weight:700;word-break:break-word;}
+  .pi-v small{display:block;font-weight:500;color:var(--ink-soft);font-size:12px;margin-top:1px;}
   .dash-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
   .dash-chips .due-chip{margin:0;}
 
@@ -762,6 +776,16 @@
   </div>
   <div class="dash-scroll" id="dash-body"></div>
 </div>
+<input type="file" id="pinfo-file" accept="application/pdf,.pdf" hidden />
+<div class="plan-overlay dash-overlay" id="pinfo-overlay" hidden>
+  <div class="plan-bar">
+    <button id="pinfo-close" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <span class="plan-title" id="pinfo-title">Plot</span>
+  </div>
+  <div class="dash-scroll" id="pinfo-body"></div>
+</div>
 <input type="file" id="plan-file" accept="application/pdf,.pdf" hidden />
 <input type="file" id="prog-file" accept="application/pdf,.pdf" hidden />
 <input type="file" id="restore-file" accept="application/json,.json" hidden />
@@ -770,7 +794,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 60 · 18 Oct";
+const BUILD = "build 61 · 18 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -786,6 +810,7 @@ const ICON = {
   clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   medal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3l4 6 4-6"/><circle cx="12" cy="15" r="6"/><path d="M12 13v4M10 15h4"/></svg>',
   undo:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l-4-4 4-4"/><path d="M5 10h10a4 4 0 010 8h-3"/></svg>',
+  house: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/></svg>',
   truck: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h11v10H3z"/><path d="M14 9h4l3 3v4h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>',
   doc:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>',
   cal:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
@@ -867,13 +892,15 @@ const TIMELINE_KEY = "siteProgress.timeline.v1";   /* { plotName: [ {stage, task
 const COMPLETED_KEY = "siteProgress.completed.v1"; /* [ { name, at, plot } ] */
 const PROGRAM_KEY = "siteProgress.programMeta.v1"; /* { uploadedAt, window, counts } */
 const RESTORE_FLAG = "siteProgress.restoredMissing.v1";
-const CALLOFF_KEY = "siteProgress.calloffs.v1";   /* { plotName: [ {trig, name, wc, done, doneAt} ] } */
+const CALLOFF_KEY = "siteProgress.calloffs.v1";
+const PLOTINFO_KEY = "siteProgress.plotInfo.v1";   /* the site's plot schedule: headers, groups, plots, legend */   /* { plotName: [ {trig, name, wc, done, doneAt} ] } */
 
 let state = load();
 let timeline = loadJSON(TIMELINE_KEY, {});
 let completed = loadJSON(COMPLETED_KEY, []);
 let programData = loadJSON(PROGRAM_KEY, null);
 let calloffs = loadJSON(CALLOFF_KEY, {});
+let plotInfo = loadJSON(PLOTINFO_KEY, null);
 let completedOpen = false, logsOpen = false, dueOpen = false, progOpen = false, calloffOpen = false, calloffShowDone = false;
 const calloffPlotsOpen = new Set();
 const logsExpanded = new Set();
@@ -1244,6 +1271,7 @@ function saveNow(){
     localStorage.setItem(TIMELINE_KEY, JSON.stringify(timeline));
     localStorage.setItem(COMPLETED_KEY, JSON.stringify(completed));
     localStorage.setItem(CALLOFF_KEY, JSON.stringify(calloffs));
+    if(plotInfo) localStorage.setItem(PLOTINFO_KEY, JSON.stringify(plotInfo)); else localStorage.removeItem(PLOTINFO_KEY);
     if(programData) localStorage.setItem(PROGRAM_KEY, JSON.stringify(programData));
     else localStorage.removeItem(PROGRAM_KEY);
   }catch(e){
@@ -1401,7 +1429,7 @@ function renderDueSection(){
       t.textContent = task.name || "(unnamed task)";
       const w = document.createElement("div");
       w.className = "due-where";
-      w.textContent = plot.name + "  ·  " + stage.name;
+      w.textContent = plotLabel(plot.name) + "  ·  " + stage.name;
       info.appendChild(t); info.appendChild(w);
       row.appendChild(info);
       row.appendChild(dueChip(task));
@@ -1513,7 +1541,7 @@ function renderCallOffSection(){
     const sNo = calloffPlotStage(n);
     const worst = left.some(i => calloffState(i) === "late") ? "over" : left.some(i => calloffState(i) === "now") ? "today" : left.length ? "" : "met";
     h.innerHTML = ICON.chev + (sNo ? '<span class="pw-stage">S' + sNo + '</span>' : '') +
-      '<span class="plot-name co-name">' + dashEsc(n) + '</span>' +
+      '<span class="plot-name co-name">' + dashEsc(n) + (houseType(n) ? ' <span class="ht-chip">' + dashEsc(houseType(n)) + '</span>' : '') + '</span>' +
       '<span class="due-chip ' + worst + '">' + (left.length ? left.length + " to call off" : "All called off") + '</span>';
     h.onclick = () => {
       if(calloffPlotsOpen.has(key)) calloffPlotsOpen.delete(key); else calloffPlotsOpen.add(key);
@@ -1699,6 +1727,7 @@ function exportCallOffPDF(){
       }
       doc.setFont("helvetica","bold"); doc.setFontSize(10); doc.setTextColor(14,20,51);
       doc.text(r.n, nx, y + 13.5);
+      if(houseType(r.n)){ doc.setFont("helvetica","normal"); doc.setFontSize(7.5); doc.setTextColor(61,90,254); doc.text(houseType(r.n), nx + doc.getTextWidth(r.n) * 10 / 7.5 + 4, y + 13.5); }
       doc.setFont("helvetica","normal"); doc.setFontSize(7);
       if(late) doc.setTextColor(210,60,78); else doc.setTextColor(106,112,150);
       doc.text("w/c " + fmtWc(wc) + (late ? "  ·  late" : ""), marginX + 4, y + 24);
@@ -2162,6 +2191,348 @@ const pct = (done, total) => total === 0 ? 0 : Math.round((done/total)*100);
    ============================================================ */
 const app = document.getElementById("app");
 
+/* ============================================================
+   Plot schedule (house type / finishes spreadsheet saved as PDF)
+   Read with PDF.js: the table's grid lines (thin filled rectangles)
+   give exact rows and columns, so tall rows like the Hesketh, and
+   cells with two lines of text, land in the right place.
+   ============================================================ */
+async function parseSchedulePDF(lib, data){
+  const doc = await lib.getDocument({ data }).promise;
+  const page = await doc.getPage(1);
+  const vp = page.getViewport({ scale: 1 });
+  const OPS = lib.OPS;
+  const mul = (m, n) => [m[0]*n[0] + m[2]*n[1], m[1]*n[0] + m[3]*n[1], m[0]*n[2] + m[2]*n[3],
+                         m[1]*n[2] + m[3]*n[3], m[0]*n[4] + m[2]*n[5] + m[4], m[1]*n[4] + m[3]*n[5] + m[5]];
+  const apply = (m, x, y) => [m[0]*x + m[2]*y + m[4], m[1]*x + m[3]*y + m[5]];
+  const toView = (x, y) => vp.convertToViewportPoint(x, y);
+
+  /* 1. grid lines from the drawing operators */
+  const ol = await page.getOperatorList();
+  let ctm = [1, 0, 0, 1, 0, 0];
+  const stack = [];
+  const hl = [], vl = [], boxes = [];
+  for(let i = 0; i < ol.fnArray.length; i++){
+    const fn = ol.fnArray[i], a = ol.argsArray[i];
+    if(fn === OPS.save) stack.push(ctm.slice());
+    else if(fn === OPS.restore){ if(stack.length) ctm = stack.pop(); }
+    else if(fn === OPS.transform) ctm = mul(ctm, a);
+    else if(fn === OPS.paintFormXObjectBegin){ stack.push(ctm.slice()); if(a && a[0]) ctm = mul(ctm, a[0]); }
+    else if(fn === OPS.paintFormXObjectEnd){ if(stack.length) ctm = stack.pop(); }
+    else if(fn === OPS.constructPath){
+      const ops = a[0], co = a[1];
+      let k = 0;
+      for(const op of ops){
+        if(op === OPS.rectangle){
+          const [x, y, w, h] = co.slice(k, k + 4); k += 4;
+          const p1 = toView(...apply(ctm, x, y)), p2 = toView(...apply(ctm, x + w, y + h));
+          const x0 = Math.min(p1[0], p2[0]), x1 = Math.max(p1[0], p2[0]);
+          const y0 = Math.min(p1[1], p2[1]), y1 = Math.max(p1[1], p2[1]);
+          if(y1 - y0 < 0.8 && x1 - x0 > 5) hl.push({ y: (y0 + y1) / 2, x0, x1 });
+          else if(x1 - x0 < 0.8 && y1 - y0 > 5) vl.push({ x: (x0 + x1) / 2, y0, y1 });
+          else if(x1 - x0 > 2 && y1 - y0 > 1) boxes.push({ x0, x1, y0, y1 });
+        }
+        else if(op === OPS.moveTo || op === OPS.lineTo) k += 2;
+        else if(op === OPS.curveTo) k += 6;
+        else if(op === OPS.curveTo2 || op === OPS.curveTo3) k += 4;
+      }
+    }
+  }
+
+  /* 2. text pieces in the same (landscape, y-down) space */
+  const tc = await page.getTextContent();
+  const items = [];
+  tc.items.forEach(it => {
+    const s = (it.str || "").trim();
+    if(!s) return;
+    const t = it.transform;
+    const len = Math.hypot(t[0], t[1]) || 1;
+    const a = toView(t[4], t[5]);
+    const b = toView(t[4] + t[0] / len * it.width, t[5] + t[1] / len * it.width);
+    const fh = Math.hypot(t[2], t[3]) || 2.5;
+    const x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]);
+    items.push({ s, x0, x1, cx: (x0 + x1) / 2, y: a[1], cy: a[1] - fh * 0.35 });
+  });
+
+  /* 3. the header cell "PLOT NO" fixes the table's left edge and header row */
+  const uniq = (arr, tol) => { const o = []; arr.sort((p, q) => p - q).forEach(v => { if(!o.length || v - o[o.length - 1] > tol) o.push(v); }); return o; };
+  const plotWord = items.filter(i => /^plot$/i.test(i.s) || /^plot\s*no/i.test(i.s))
+    .sort((p, q) => p.y - q.y)
+    .find(i => items.some(j => /^no\.?$/i.test(j.s) && Math.abs(j.y - i.y) < 1.5 && j.x0 > i.x0 && j.x0 - i.x1 < 6) || /^plot\s*no/i.test(i.s));
+  if(!plotWord) throw new Error("Couldn't find the PLOT NO column — is this a plot schedule?");
+
+  const rowsY = uniq(hl.filter(l => l.x0 <= plotWord.cx && l.x1 >= plotWord.cx).map(l => l.y), 0.35);
+  const headTop = rowsY.filter(y => y < plotWord.cy).pop();
+  const headBot = rowsY.find(y => y > plotWord.cy);
+  if(headTop == null || headBot == null) throw new Error("Couldn't read the table grid");
+  /* column lines run down the body (the header row itself is filled boxes) */
+  const probe = headBot + 1;
+  const colsX = uniq(vl.filter(l => l.y0 <= probe && l.y1 >= probe).map(l => l.x), 0.35);
+  const ncol = colsX.length - 1;
+  if(ncol < 3) throw new Error("Couldn't read the table columns");
+
+  const cellText = (y0, y1, x0, x1) => {
+    const its = items.filter(i => i.cx > x0 && i.cx < x1 && i.cy > y0 && i.cy < y1).sort((p, q) => p.y - q.y || p.x0 - q.x0);
+    const lines = [];
+    its.forEach(i => { const L = lines[lines.length - 1]; if(L && Math.abs(L.y - i.y) < 0.9) L.parts.push(i); else lines.push({ y: i.y, parts: [i] }); });
+    return lines.map(L => joinParts(L.parts)).join(" ").replace(/\s+/g, " ").trim();
+  };
+  function joinParts(parts){
+    parts.sort((p, q) => p.x0 - q.x0);
+    let out = "", lastX1 = null;
+    parts.forEach(p => {
+      if(lastX1 != null && p.x0 < lastX1 - 0.3 && out.endsWith(p.s)) return;    /* the same text drawn twice */
+      out += (lastX1 == null ? "" : (p.x0 - lastX1 > 0.35 ? " " : "")) + p.s;
+      lastX1 = Math.max(lastX1 == null ? p.x1 : lastX1, p.x1);
+    });
+    return out;
+  }
+  const colOf = cx => { for(let c = 0; c < ncol; c++) if(cx > colsX[c] && cx < colsX[c + 1]) return c; return -1; };
+
+  /* header names (two-line headers read top line first) */
+  const headers = [];
+  for(let c = 0; c < ncol; c++) headers.push(cellText(headTop, headBot, colsX[c], colsX[c + 1]));
+
+  /* group bands above the header (PLOT TYPE INFO, M&E, …): text centred over a merged cell */
+  const groups = new Array(ncol).fill("");
+  const gTop = rowsY.filter(y => y < headTop - 0.3).pop();
+  if(gTop != null){
+    /* each group heading sits in a coloured box spanning its columns */
+    boxes.filter(b => b.y0 >= gTop - 0.5 && b.y1 <= headTop + 0.5).forEach(b => {
+      const name = cellText(gTop, headTop, b.x0, b.x1);
+      if(!name) return;
+      for(let c = 0; c < ncol; c++){ const mid = (colsX[c] + colsX[c + 1]) / 2; if(mid > b.x0 && mid < b.x1) groups[c] = name; }
+    });
+  }
+
+  /* data rows: every grid row below the header whose first cell is a plot number */
+  const plots = {};
+  const order = [];
+  const bodyRows = rowsY.filter(y => y >= headBot - 0.01);
+  let tableBottom = headBot;
+  for(let r = 0; r < bodyRows.length - 1; r++){
+    const y0 = bodyRows[r], y1 = bodyRows[r + 1];
+    const first = cellText(y0, y1, colsX[0], colsX[1]);
+    if(!/^\d{1,4}[A-Za-z]?$/.test(first)) continue;
+    const vals = [];
+    for(let c = 0; c < ncol; c++) vals.push(cellText(y0, y1, colsX[c], colsX[c + 1]));
+    if(!plots[first]) order.push(first);
+    plots[first] = vals;
+    tableBottom = y1;
+  }
+  if(!order.length) throw new Error("No plot rows found");
+
+  /* 4. legend below the table: "Title" lines followed by "CODE - meaning" lines */
+  const below = items.filter(i => i.cy > tableBottom + 1).sort((p, q) => p.x0 - q.x0 || p.y - q.y);
+  const lines = [];
+  below.forEach(i => {
+    const L = lines.find(l => Math.abs(l.y - i.y) < 0.9 && i.x0 - l.x1 < 3 && i.x0 >= l.x0 - 0.5);
+    if(L){ L.s += (i.x0 - L.x1 > 0.35 ? " " : "") + i.s; L.x1 = i.x1; } else lines.push({ s: i.s, x0: i.x0, x1: i.x1, y: i.y });
+  });
+  const colsL = [];
+  lines.forEach(l => { let c = colsL.find(c => Math.abs(c.x - l.x0) < 4); if(!c){ c = { x: l.x0, lines: [] }; colsL.push(c); } c.lines.push(l); });
+  const legends = [];
+  colsL.forEach(c => {
+    c.lines.sort((p, q) => p.y - q.y);
+    let cur = null, lastY = -1e9;
+    c.lines.forEach(l => {
+      const m = l.s.match(/^([A-Za-z0-9*()\/.]{1,10})\s+-\s+(.+)$/);
+      if(m && cur && l.y - lastY < 8) cur.codes[m[1].toUpperCase()] = m[2].replace(/\s+/g, " ").replace(/w (?=[a-z])/g, "w");   /* the sheet's font splits words after "w" */
+      else if(!m && l.s.length < 60){ cur = { title: l.s.replace(/\s+/g, " "), codes: {} }; legends.push(cur); }
+      lastY = l.y;
+    });
+  });
+
+  const site = (items.find(i => /^site:/i.test(i.s)) ? items.filter(i => Math.abs(i.y - items.find(j => /^site:/i.test(j.s)).y) < 0.9 && i.x0 < plotWord.x0 + 200).sort((p, q) => p.x0 - q.x0).map(i => i.s).join(" ").replace(/^site:\s*/i, "").replace(/\s+\d+\s+total plots.*$/i, "").trim() : "");
+  return { site, headers, groups, plots, order, legends: legends.filter(l => Object.keys(l.codes).length) };
+}
+
+/* ---- plot information: house type and everything else per plot, from the plot schedule ---- */
+function piCol(re){ if(!plotInfo) return -1; return plotInfo.headers.findIndex(h => re.test(h)); }
+function piNum(name){ const m = String(name || "").match(/\d+[A-Za-z]?/); return m ? m[0] : null; }
+function piRow(name){ if(!plotInfo) return null; const n = piNum(name); return n ? plotInfo.plots[n] || null : null; }
+function houseType(name){
+  const r = piRow(name), c = piCol(/^house type$/i);
+  const v = r && c >= 0 ? r[c] : "";
+  return v && v !== "-" ? v : "";
+}
+/* "Plot 63 · Hesketh" wherever a plot is named */
+function plotLabel(name){ const ht = houseType(name); return ht ? name + " · " + ht : name; }
+
+/* turn a legend code (e.g. Front Door Colour "E") into its meaning from the sheet's key */
+const PI_STOP = new Set(["the","of","and","to","a","s"]);
+function piWords(t){
+  return String(t).toLowerCase().replace(/\(s\)|\(es\)/g, "").replace(/[^a-z0-9 ]+/g, " ").split(/\s+/)
+    .filter(w => w && !PI_STOP.has(w))
+    .map(w => w === "extract" ? "fan" : w.replace(/(es|s)$/, "").replace(/e$/, ""));
+}
+let piLegendCache = null;
+function piLegendFor(ci){
+  if(!plotInfo || !plotInfo.legends) return null;
+  if(!piLegendCache || piLegendCache.src !== plotInfo){
+    piLegendCache = { src: plotInfo, map: plotInfo.headers.map(h => {
+      const hw = piWords(h);
+      let best = null, bestScore = 0;
+      plotInfo.legends.forEach(L => {
+        const lw = piWords(L.title);
+        if(!lw.length || !hw.includes(lw[0])) return;
+        const score = lw.filter(w => hw.includes(w)).length / lw.length;
+        if(score >= 0.66 && score > bestScore){ best = L; bestScore = score; }
+      });
+      return best;
+    }) };
+  }
+  return piLegendCache.map[ci];
+}
+function piDecode(ci, v){
+  const L = piLegendFor(ci);
+  if(!L || !v) return "";
+  return L.codes[String(v).toUpperCase()] || "";
+}
+function piTidy(h){ return h.replace(/\bTHERMA\b/, "THERMAL").replace(/VARIATON/, "VARIATION").replace(/BOXE\(S\)/, "BOX(ES)").replace(/TYPE2$/, "TYPE"); }
+function piCase(h){ return piTidy(h).toLowerCase().replace(/(^|[\s\/(&-])([a-z])/g, (m, p, c) => p + c.toUpperCase()).replace(/\bEv\b/, "EV").replace(/\bPv\b/, "PV").replace(/\bWwhr\b/, "WWHR").replace(/\bM&e\b/i, "M&E").replace(/\bSq\.m\b/i, "sq m").replace(/\bSq\.ft\b/i, "sq ft").replace(/\bEpc\b/, "EPC").replace(/\bEn-suite\b/i, "En-suite").replace(/\(S\)/g, "(s)").replace(/\(Es\)/g, "(es)"); }
+
+/* one plot's information, grouped like the sheet; '-' entries left out */
+function plotInfoHTML(name){
+  const r = piRow(name);
+  if(!r) return '<div class="dash-empty">' + dashEsc(name) + ' isn\'t on the plot schedule.</div>';
+  let h = "", lastG = null;
+  plotInfo.headers.forEach((hd, i) => {
+    if(i === 0) return;
+    const v = r[i];
+    if(!v || v === "-") return;
+    const g = plotInfo.groups[i] || "";
+    if(g !== lastG){ if(lastG !== null) h += '</div>'; h += '<div class="pi-group"><div class="pi-gt">' + dashEsc(piCase(g || "Details")) + '</div>'; lastG = g; }
+    const dec = piDecode(i, v);
+    h += '<div class="pi-row"><span class="pi-k">' + dashEsc(piCase(hd)) + '</span><span class="pi-v">' + dashEsc(v) +
+         (dec ? '<small>' + dashEsc(dec) + '</small>' : '') + '</span></div>';
+  });
+  if(lastG !== null) h += '</div>';
+  return h;
+}
+function plotSummaryLine(name){
+  const r = piRow(name);
+  if(!r) return "";
+  const get = re => { const c = piCol(re); return c >= 0 && r[c] && r[c] !== "-" ? r[c] : ""; };
+  const bits = [];
+  const bed = get(/^bed/i); if(bed) bits.push(bed + " bed");
+  const typ = get(/flat \/ house type/i); if(typ) bits.push(typ);
+  const hand = get(/^handing/i); if(hand) bits.push(hand);
+  const sz = get(/size \(sq\.?m\)/i); if(sz) bits.push(sz + " m²");
+  return bits.join(" · ");
+}
+
+/* the Plot Information section in the main list */
+let plotInfoOpen = false, piSearch = "";
+const piOpenPlots = new Set();
+function renderPlotInfoSection(){
+  const el = document.createElement("div");
+  el.className = "stage summary pinfo-summary" + (plotInfoOpen ? " open" : "");
+  const n = plotInfo ? plotInfo.order.length : 0;
+  const head = summaryHead("Plot Information", ICON.house, n ? n + " plots" : "Upload", plotInfoOpen,
+    () => { plotInfoOpen = !plotInfoOpen; el.classList.toggle("open", plotInfoOpen); });
+  el.appendChild(head);
+  const body = document.createElement("div");
+  body.className = "stage-body";
+
+  const up = document.createElement("button");
+  up.className = "add-btn calloff-export";
+  up.innerHTML = ICON.doc + (plotInfo ? " Upload new plot schedule PDF" : " Upload plot schedule PDF");
+  up.onclick = () => document.getElementById("pinfo-file").click();
+  body.appendChild(up);
+
+  if(!plotInfo){
+    body.appendChild(emptyNote("Upload the site's plot schedule (house types, finishes, M&E, building regs…). House types then show next to plot numbers everywhere, and every plot's details are here."));
+    el.appendChild(body);
+    return el;
+  }
+  const meta = document.createElement("div");
+  meta.className = "prog-meta";
+  meta.textContent = (plotInfo.site ? plotInfo.site + " · " : "") + plotInfo.order.length + " plots · uploaded " +
+    fmtDate(plotInfo.uploadedAt) + (plotInfo.by ? " by " + plotInfo.by : "");
+  body.appendChild(meta);
+
+  const search = document.createElement("input");
+  search.className = "pi-search";
+  search.placeholder = "Search plot number, house type, finish…";
+  search.value = piSearch;
+  body.appendChild(search);
+
+  const list = document.createElement("div");
+  plotInfo.order.forEach(num => {
+    const name = "Plot " + num;
+    const card = document.createElement("div");
+    card.className = "plot co-plot pi-plot" + (piOpenPlots.has(num) ? " open" : "");
+    card.dataset.search = (name + " " + plotInfo.plots[num].join(" ")).toLowerCase();
+    const h = document.createElement("div");
+    h.className = "plot-head";
+    const ht = houseType(name);
+    const st = state.find(s => !s.basic && s.progNo && s.plots.some(p => p.name === name));
+    h.innerHTML = ICON.chev + (st ? '<span class="pw-stage">S' + st.progNo + '</span>' : '') +
+      '<span class="plot-name co-name">' + dashEsc(name) + (ht ? ' <span class="ht-chip">' + dashEsc(ht) + '</span>' : '') +
+      '<small class="pi-sum">' + dashEsc(plotSummaryLine(name)) + '</small></span>';
+    const b = document.createElement("div");
+    b.className = "plot-body";
+    if(piOpenPlots.has(num)) b.innerHTML = plotInfoHTML(name);
+    h.onclick = () => {
+      if(piOpenPlots.has(num)) piOpenPlots.delete(num); else { piOpenPlots.add(num); if(!b.innerHTML) b.innerHTML = plotInfoHTML(name); }
+      card.classList.toggle("open");
+    };
+    card.appendChild(h); card.appendChild(b);
+    list.appendChild(card);
+  });
+  body.appendChild(list);
+  const filter = () => {
+    piSearch = search.value;
+    const q = piSearch.trim().toLowerCase();
+    list.querySelectorAll(".pi-plot").forEach(c => {
+      const words = q.split(/\s+/).filter(Boolean);
+      c.style.display = !words.length || words.every(w => c.dataset.search.includes(w)) ? "" : "none";
+    });
+  };
+  search.oninput = filter;
+  filter();
+  el.appendChild(body);
+  return el;
+}
+
+/* pop-up with one plot's details (tap a house type anywhere) */
+function openPlotInfo(name){
+  const ov = document.getElementById("pinfo-overlay");
+  document.getElementById("pinfo-title").innerHTML = dashEsc(name) + (houseType(name) ? ' <span style="color:var(--blue)">' + dashEsc(houseType(name)) + '</span>' : '');
+  document.getElementById("pinfo-body").innerHTML =
+    '<div class="dash-card"><div class="dash-sub">' + dashEsc(plotSummaryLine(name)) + '</div>' + plotInfoHTML(name) + '</div>';
+  ov.hidden = false;
+  document.body.style.overflow = "hidden";
+}
+function closePlotInfo(){ document.getElementById("pinfo-overlay").hidden = true; document.body.style.overflow = ""; }
+
+async function onPlotInfoFile(e){
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if(!f) return;
+  if(!window.pdfjsLib){ showToast("PDF reader not loaded — check connection"); return; }
+  showToast("Reading plot schedule…");
+  try{
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    const res = await parseSchedulePDF(window.pdfjsLib, new Uint8Array(await f.arrayBuffer()));
+    const htc = res.headers.findIndex(h => /^house type$/i.test(h));
+    if(htc < 0) throw new Error("No HOUSE TYPE column found");
+    const types = {};
+    res.order.forEach(n => { const t = res.plots[n][htc]; types[t] = (types[t] || 0) + 1; });
+    const summary = Object.keys(types).sort((a, b) => types[b] - types[a]).slice(0, 6).map(t => t + " ×" + types[t]).join(", ");
+    if(!confirm("Plot schedule read: " + res.order.length + " plots" + (res.site ? " — " + res.site : "") + "\n\n" + summary +
+                (Object.keys(types).length > 6 ? ", …" : "") + "\n\nUse this schedule" + (plotInfo ? " (replaces the current one)" : "") + "?")) return;
+    plotInfo = Object.assign(res, { fileName: f.name, uploadedAt: Date.now(), by: me ? (me.name || me.email) : "" });
+    piLegendCache = null;
+    saveNow(); render();
+    showToast("Plot schedule saved — " + res.order.length + " plots");
+  }catch(err){
+    console.warn(err);
+    showToast("Couldn't read that PDF: " + (err.message || "unknown problem"));
+  }
+}
+
 /* task whose tick should play the pop animation on the next render */
 let popTaskId = null;
 
@@ -2171,6 +2542,7 @@ function render(){
   app.appendChild(renderProgSection());
   app.appendChild(renderDueSection());
   app.appendChild(renderCallOffSection());
+  app.appendChild(renderPlotInfoSection());
   state.forEach(stage => app.appendChild(renderStage(stage)));
 
   const addStage = document.createElement("button");
@@ -2260,7 +2632,7 @@ function renderCompletedSection(){
       info.className = "sum-info";
       const nm = document.createElement("div");
       nm.className = "sum-name";
-      nm.textContent = c.name;
+      nm.textContent = plotLabel(c.name);
       const meta = document.createElement("div");
       meta.className = "sum-meta";
       const total = plotTotal(c.name);
@@ -2564,6 +2936,15 @@ function renderPlot(stage, plot){
   frac.textContent = done + "/" + total;
 
   head.appendChild(nameInput);
+  const ht = houseType(plot.name);
+  if(ht){
+    const htc = document.createElement("span");
+    htc.className = "ht-chip";
+    htc.textContent = ht;
+    htc.title = "Plot details";
+    htc.onclick = e => { e.stopPropagation(); openPlotInfo(plot.name); };
+    head.appendChild(htc);
+  }
   head.appendChild(frac);
   /* Foundations plot that hasn't reached its programme "1" yet: only a countdown, nothing else */
   const notYet = stage.progNo === 1 && !stage.basic && !plotStarted(plot, stage);
@@ -3031,7 +3412,7 @@ function exportPDF(){
       doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.setTextColor(14,20,51);
       doc.text(r.p.name, x, y + 6);
       doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(106,112,150);
-      doc.text("w/c " + r.wc, x + 46, y + 6);
+      doc.text((houseType(r.p.name) ? houseType(r.p.name) + " · " : "") + "w/c " + r.wc, x + 46, y + 6);
       doc.setFillColor(221,227,251);
       doc.rect(bx, y, bw * Math.max(r.wks, .25) / mxS1, 8, "F");
       doc.setFont("helvetica","bold"); doc.setFontSize(7.5);
@@ -3051,7 +3432,7 @@ function exportPDF(){
       doc.setFillColor(col[0], col[1], col[2]);
       doc.circle(x + 3, y + 1.5, 2.2, "F");
       doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.setTextColor(14,20,51);
-      doc.text(c.p.name, x + 10, y + 4);
+      doc.text(plotLabel(c.p.name), x + 10, y + 4);
       doc.setFont("helvetica","normal"); doc.setTextColor(col[0], col[1], col[2]);
       doc.text(claimLabel(c.ci, c.st.progNo), x + 62, y + 4);
       y += 11;
@@ -3212,6 +3593,12 @@ function exportPDF(){
       doc.setFontSize(10);
       doc.setTextColor(14,20,51);
       doc.text(p.name || "Plot", nameX, y + 13.5);
+      const htP = houseType(p.name);
+      if(htP){
+        const nw = doc.getTextWidth(p.name || "Plot");
+        doc.setFont("helvetica","normal"); doc.setFontSize(7.5); doc.setTextColor(61,90,254);
+        doc.text(htP, nameX + nw + 5, y + 13.5);
+      }
       doc.setFont("helvetica","normal");
       doc.setFontSize(6.8);
       lines.forEach((ln, li) => {
@@ -3436,6 +3823,11 @@ function exportEvidencePDF(){
       doc.setFontSize(10);
       doc.setTextColor(30, 58, 58);
       doc.text(p.name || "Plot", marginX + 4, y + 13.5);
+      if(houseType(p.name)){
+        const nw = doc.getTextWidth(p.name || "Plot");
+        doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(61, 90, 254);
+        doc.text(houseType(p.name), marginX + 4 + nw + 5, y + 13.5);
+      }
 
       cols.forEach((c, i) => {
         const t = p.tasks.find(tt => norm(tt.name) === norm(c));
@@ -3605,6 +3997,8 @@ function planBind(){
   document.getElementById("plan-btn").onclick = openPlan;
   document.getElementById("dash-btn").onclick = openDashboard;
   document.getElementById("dash-close").onclick = closeDashboard;
+  document.getElementById("pinfo-file").onchange = onPlotInfoFile;
+  document.getElementById("pinfo-close").onclick = closePlotInfo;
   planEls.attach.onclick = () => planEls.file.click();
   planEls.file.onchange = onPlanFile;
   planEls.replace.onclick = planMenu;
@@ -3658,7 +4052,8 @@ function stageWeeks(plot, stage){
 }
 function weeksLabel(w){
   if(!w || w.el == null) return "—";
-  return Math.floor(w.el) + (w.planned != null ? " of " + w.planned : "") + " wks";   /* whole weeks completed */
+  const n = Math.floor(w.el);                     /* whole weeks completed */
+  return n + (w.planned != null ? " of " + w.planned + " wks" : (n === 1 ? " wk" : " wks"));
 }
 /* light bar = programme weeks, dark = weeks in so far, red = past programme, white ticks between weeks */
 function weeksTrackHTML(w, scale){
@@ -3691,7 +4086,7 @@ function dashTaskRows(rows){
       '<div class="dash-track"><div class="lt" style="width:' + (r.total / max * 100) + '%"></div>' +
       '<div class="dk ok" style="width:' + (r.done / max * 100) + '%"></div></div>' +
       '<div class="dash-val' + (left ? ' bad' : '') + '">' + (left ? left + ' left' : 'All done') + '</div></div>' +
-      (left ? '<div class="dash-list">' + r.out.map(n => '<span>' + dashEsc(n) + '</span>').join("") + '</div>' : '');
+      (left ? '<div class="dash-list">' + r.out.map(n => '<span>' + dashEsc(plotLabel(n)) + '</span>').join("") + '</div>' : '');
   }).join("");
 }
 
@@ -3807,7 +4202,7 @@ function renderDashboard(){
   if(nx.length){
     const mx = Math.max(1, ...nx.map(r => r.wks));
     h += nx.map(r => '<div class="dash-row" title="' + dashEsc(r.p.name + ': S1 week commencing ' + r.wc) + '">' +
-      '<div class="dash-lbl">' + dashEsc(r.p.name) + '<small>w/c ' + dashEsc(r.wc) + '</small></div>' +
+      '<div class="dash-lbl">' + dashEsc(r.p.name) + '<small>' + (houseType(r.p.name) ? dashEsc(houseType(r.p.name)) + ' · ' : '') + 'w/c ' + dashEsc(r.wc) + '</small></div>' +
       '<div class="dash-track"><div class="lt" style="width:' + (Math.max(r.wks, .25) / mx * 100) + '%"></div></div>' +
       '<div class="dash-val' + (r.days < 7 ? ' soon' : '') + '">' + r.label + '</div></div>').join("");
   } else h += '<div class="dash-empty">No Foundations plots waiting on a programme 1 — upload the programme to see them.</div>';
@@ -3823,12 +4218,12 @@ function renderDashboard(){
       '<div class="dash-lbl">' + dashEsc(s.name) + '</div>' +
       '<div class="dash-track"><div class="lt" style="width:100%"></div><div class="dk" style="width:' + (n / maxIn * 100) + '%"></div></div>' +
       '<div class="dash-val">' + n + (n === 1 ? ' plot' : ' plots') + '</div></div>' +
-      (n ? '<div class="dash-list">' + sp.map(p => '<span class="blue">' + dashEsc(p.name) + '</span>').join("") + '</div>' : '');
+      (n ? '<div class="dash-list">' + sp.map(p => '<span class="blue">' + dashEsc(plotLabel(p.name)) + '</span>').join("") + '</div>' : '');
   }).join("");
   if(claims.length){
     h += '<div class="dash-group" style="margin-top:14px">Claims this week</div><div class="dash-chips">' +
       claims.map(c => '<span class="due-chip ' + (c.ci.st === "over" ? "over" : c.ci.st === "today" ? "today" : "") + '">' +
-        dashEsc(c.p.name) + ' · ' + dashEsc(claimLabel(c.ci, c.st.progNo)) + '</span>').join("") + '</div>';
+        dashEsc(plotLabel(c.p.name)) + ' · ' + dashEsc(claimLabel(c.ci, c.st.progNo)) + '</span>').join("") + '</div>';
   }
   h += '</div>';
 
@@ -3868,7 +4263,7 @@ function renderDashboard(){
       const tip = r.p.name + " · " + r.st.name + ": " + (r.el == null ? "no start date" : r.el.toFixed(1) + " weeks in") +
                   (r.planned != null ? ", programme " + r.planned + " weeks" : ", no programme");
       h += '<div class="dash-row" title="' + dashEsc(tip) + '">' +
-        '<div class="dash-lbl">' + dashEsc(r.p.name) + (r.planned == null ? '<small>no programme</small>' : '') + '</div>' +
+        '<div class="dash-lbl">' + dashEsc(r.p.name) + ((houseType(r.p.name) || r.planned == null) ? '<small>' + dashEsc([houseType(r.p.name), r.planned == null ? "no programme" : ""].filter(Boolean).join(" · ")) + '</small>' : '') + '</div>' +
         weeksTrackHTML(r, scale) +
         '<div class="dash-val' + (r.over ? ' bad' : '') + '">' + weeksLabel(r) + '</div></div>';
     });
@@ -4169,7 +4564,7 @@ window.addEventListener("pagehide", saveNow);
    ============================================================ */
 function backupData(){
   return { kind: "site-progress-backup", version: 2, at: Date.now(),
-           state: state, timeline: timeline, completed: completed, programData: programData, calloffs: calloffs };
+           state: state, timeline: timeline, completed: completed, programData: programData, calloffs: calloffs, plotInfo: plotInfo };
 }
 function exportBackup(){
   saveNow();
@@ -4205,6 +4600,7 @@ function applyBackup(d){
   completed = Array.isArray(d.completed) ? d.completed : [];
   programData = d.programData || null;
   calloffs = d.calloffs || {};
+  if(d.plotInfo) plotInfo = d.plotInfo;
   saveNow(); render();
   if(syncReady) syncForceUpload().then(() => showToast("Backup restored and shared with the team"));
   showToast("Backup restored");
@@ -4278,7 +4674,7 @@ checkForUpdate();
    ============================================================ */
 const SB_URL = "https://exgtwsorllyzhohefowu.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV4Z3R3c29ybGx5emhvaGVmb3d1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIyODY0NjcsImV4cCI6MjEwNzg2MjQ2N30.ocVjQxWe4a9OUOhHecBHZbBKzRkhRdp5PZp-0prynnM";
-const SYNC_KEYS = ["state", "timeline", "completed", "calloffs", "programData"];
+const SYNC_KEYS = ["state", "timeline", "completed", "calloffs", "programData", "plotInfo"];
 const SYNC_META_KEY = "siteProgress.sync.v1";      /* { base: { key: { version, value } } } */
 
 var sb = null, me = null, syncReady = false, syncBusy = false, syncTimer = null, syncChannel = null;   /* var: saveNow may run before this line */
@@ -4306,6 +4702,7 @@ function getLocal(key){
   if(key === "completed") return completed;
   if(key === "calloffs") return calloffs;
   if(key === "programData") return programData || {};
+  if(key === "plotInfo") return plotInfo || {};
 }
 function setLocal(key, value){
   if(key === "state"){
@@ -4318,6 +4715,7 @@ function setLocal(key, value){
   else if(key === "completed") completed = Array.isArray(value) ? clone(value) : [];
   else if(key === "calloffs") calloffs = clone(value) || {};
   else if(key === "programData") programData = (value && Object.keys(value).length) ? clone(value) : null;
+  else if(key === "plotInfo"){ plotInfo = (value && value.headers) ? clone(value) : null; piLegendCache = null; }
 }
 /* Merge one document. For the site state, a plot moved on one device while being edited on another
    can end up in two flow stages; only copies the merge itself created are dropped (furthest stage kept). */
