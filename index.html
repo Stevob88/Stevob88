@@ -770,7 +770,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 58 · 18 Oct";
+const BUILD = "build 59 · 18 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -1246,7 +1246,18 @@ function saveNow(){
     localStorage.setItem(CALLOFF_KEY, JSON.stringify(calloffs));
     if(programData) localStorage.setItem(PROGRAM_KEY, JSON.stringify(programData));
     else localStorage.removeItem(PROGRAM_KEY);
-  }catch(e){ console.warn("save failed", e); }
+  }catch(e){
+    console.warn("save failed", e);
+    /* storage full: the site data matters most — free the sync copies and try once more */
+    try{
+      localStorage.removeItem("siteProgress.preSyncBackup");
+      localStorage.removeItem("siteProgress.sync.v1");
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+      localStorage.setItem(TIMELINE_KEY, JSON.stringify(timeline));
+      localStorage.setItem(COMPLETED_KEY, JSON.stringify(completed));
+      localStorage.setItem(CALLOFF_KEY, JSON.stringify(calloffs));
+    }catch(e2){ showToast("Phone storage full — make a backup now"); }
+  }
   if(typeof syncNoteLocalChange === "function") syncNoteLocalChange();
 }
 
@@ -4179,15 +4190,18 @@ function importBackup(f){
     const d = JSON.parse(txt);
     if(!d || d.kind !== "site-progress-backup" || !Array.isArray(d.state)) throw new Error("bad backup");
     if(!confirm("Restore backup from " + fmtDate(d.at) + "?\n\nThis REPLACES everything currently in this app on this phone.")) return;
-    state = migrate(normalize(d.state));
-    timeline = d.timeline || {};
-    completed = Array.isArray(d.completed) ? d.completed : [];
-    programData = d.programData || null;
-    calloffs = d.calloffs || {};
-    saveNow(); render();
-    if(syncReady) syncForceUpload().then(() => showToast("Backup restored and shared with the team"));
-    showToast("Backup restored");
+    applyBackup(d);
   }).catch(err => { console.warn(err); showToast("That's not a Site Progress backup file"); });
+}
+function applyBackup(d){
+  state = migrate(normalize(d.state));
+  timeline = d.timeline || {};
+  completed = Array.isArray(d.completed) ? d.completed : [];
+  programData = d.programData || null;
+  calloffs = d.calloffs || {};
+  saveNow(); render();
+  if(syncReady) syncForceUpload().then(() => showToast("Backup restored and shared with the team"));
+  showToast("Backup restored");
 }
 
 /* ---- self-update: fetch a fresh copy of this page and reload if the build is newer ----
@@ -4456,25 +4470,33 @@ function saveLocalOnly(){
 async function syncFirst(){
   const { data, error } = await sb.from("docs").select("key,version,value");
   if(error) throw error;
+  const firstTime = Object.keys(syncMeta.base).length === 0;
+  if(firstTime){
+    /* safety copy of everything on this device before it ever syncs (restore from Account & team) */
+    try{ localStorage.setItem("siteProgress.preSyncBackup", JSON.stringify(backupData())); }catch(e){ console.warn(e); }
+  }
   if(!data.length){                               /* nobody has uploaded yet: this device's data becomes the site data */
     syncMeta.base = {};
     saveSyncMeta();
     await syncPush();
-    showToast("Site data uploaded — other devices will now see it");
+    if(!dirtyKeys().length) showToast("Your site data is uploaded — other devices will now see it");
     return;
   }
-  const hasBase = Object.keys(syncMeta.base).length > 0;
-  if(!hasBase){
-    const local = SYNC_KEYS.map(getLocal), remote = SYNC_KEYS.map(k => (data.find(d => d.key === k) || {}).value);
-    const differs = !jsonEq(local[0], remote[0]);
-    const localHasWork = overallCounts().done > 0;
-    try{ localStorage.setItem("siteProgress.preSyncBackup", JSON.stringify(backupData())); }catch(e){}
-    if(differs && localHasWork && isOwner() &&
-       confirm("This device has its own site data, and the shared site data is different.\n\nOK = REPLACE the shared data with this device's data (everyone will see this device's version)\nCancel = use the shared site data on this device (recommended)")){
-      for(const row of data) syncMeta.base[row.key] = { version: row.version, value: undefined };
-      saveSyncMeta();
-      await syncForceUpload();
-      return;
+  if(firstTime){
+    const differs = !jsonEq(getLocal("state"), (data.find(d => d.key === "state") || {}).value);
+    const localHasWork = overallCounts().done > 0 || Object.keys(timeline).length > 0;
+    if(differs && localHasWork){
+      if(confirm("This device has its own site data, and the shared site data is different.\n\nOK = KEEP this device's data and share it with everyone\nCancel = more options")){
+        await syncForceUpload();
+        showToast("This device's data is now the shared site data");
+        return;
+      }
+      if(!confirm("Replace this device's data with the shared site data?\n\nA safety copy of this device's data is kept — you can restore it from Account & team (tap the logo).\n\nOK = use the shared data\nCancel = don't sync this device yet")){
+        syncReady = false;
+        setSyncStatus("error");
+        showToast("Not synced — this device's data is untouched");
+        return;
+      }
     }
   }
   await syncPull();
@@ -4578,14 +4600,27 @@ async function afterSignIn(){
   }catch(e){ console.warn(e); setSyncStatus("error"); }
 }
 
+function workOffline(){
+  /* signed in on this device before: keep working on the phone, sync once back online */
+  const cachedMe = loadJSON("siteProgress.me.v1", null);
+  if(!cachedMe) return false;
+  me = cachedMe; hideAuth(); setSyncStatus("offline");
+  window.addEventListener("online", () => location.reload(), { once: true });
+  return true;
+}
 async function syncInit(){
-  if(!window.supabase){ setSyncStatus("error"); showAuth("signin", "Couldn't load sign-in — check your connection and reopen the app"); return; }
+  if(!window.supabase){
+    if(workOffline()) return;
+    setSyncStatus("error"); showAuth("signin", "Couldn't load sign-in — check your connection and reopen the app"); return;
+  }
   sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: "siteProgress.auth" } });
   document.getElementById("auth-go").onclick = authSubmit;
   document.getElementById("auth-password").addEventListener("keydown", e => { if(e.key === "Enter") authSubmit(); });
   sb.auth.onAuthStateChange((ev) => { if(ev === "SIGNED_OUT"){ syncReady = false; me = null; setSyncStatus("off"); } });
-  const { data: { session } } = await sb.auth.getSession();
+  let session = null;
+  try{ session = (await sb.auth.getSession()).data.session; }catch(e){ console.warn(e); }
   if(session){ await afterSignIn(); return; }
+  if(navigator.onLine === false && workOffline()) return;
   let setup = false;
   try{ const r = await sb.rpc("bootstrap_open"); setup = r.data === true; }catch(e){}
   showAuth(setup ? "setup" : "signin");
@@ -4618,7 +4653,18 @@ async function renderAccount(){
       '<input id="tm-pass" type="text" placeholder="Password (min 8 characters)" autocomplete="off" />' +
       '<button class="calloff-export" id="tm-add">Add colleague</button><div class="acct-msg" id="tm-msg"></div></div></div>';
   }
+  const pre = loadJSON("siteProgress.preSyncBackup", null);
+  if(pre && pre.state){
+    h += '<div class="dash-card"><h3>Safety <em>copy</em></h3><div class="dash-sub">This device\'s data as it was before it first synced (' +
+      dashEsc(fmtDate(pre.at)) + '). Restoring it replaces the shared site data for everyone.</div>' +
+      '<div class="acct-btns"><button class="add-btn" id="acct-pre">Restore safety copy</button></div></div>';
+  }
   body.innerHTML = h;
+  const preBtn = document.getElementById("acct-pre");
+  if(preBtn) preBtn.onclick = () => {
+    if(!confirm("Restore this device's data from before it first synced (" + fmtDate(pre.at) + ")?\n\nThis replaces the shared site data for everyone.")) return;
+    closeAccount(); applyBackup(pre);
+  };
   document.getElementById("acct-syncnow").onclick = async () => { setSyncStatus("pending"); await syncPush(); await syncPull(); };
   document.getElementById("acct-signout").onclick = async () => {
     if(!confirm("Sign out of Site Progress on this device?")) return;
