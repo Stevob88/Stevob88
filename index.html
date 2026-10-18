@@ -23,6 +23,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
+<!-- Supabase — sign-in and live sync between devices -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+
 <!-- jsPDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -593,6 +596,39 @@
   .dash-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
   .dash-chips .due-chip{margin:0;}
 
+  /* ---------- Sign-in, account, sync status ---------- */
+  .brand .mark{position:relative;cursor:pointer;}
+  .brand h1{cursor:pointer;}
+  .sync-dot{position:absolute;right:-3px;bottom:-3px;width:12px;height:12px;border-radius:50%;border:2px solid #fff;background:#B8BED8;}
+  .sync-dot.ok{background:var(--green);}
+  .sync-dot.pending{background:var(--amber);animation:pulse 1s ease-in-out infinite;}
+  .sync-dot.offline{background:#9AA2C4;}
+  .sync-dot.error{background:var(--danger);}
+  .auth-overlay{position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;padding:20px;
+    background:radial-gradient(60% 45% at 50% 30%,rgba(110,128,255,.25),transparent 70%),var(--bg);overflow-y:auto;}
+  .auth-overlay[hidden]{display:none;}
+  .auth-card{width:100%;max-width:380px;background:#fff;border-radius:26px;box-shadow:var(--shadow);padding:26px 22px 22px;animation:rise .5s var(--ease-out) both;}
+  .auth-logo{width:64px;height:64px;border-radius:18px;display:block;margin:0 auto 14px;box-shadow:0 12px 26px rgba(42,63,214,.25);}
+  .auth-card h2{text-align:center;font-size:24px;font-weight:800;letter-spacing:-.6px;}
+  .auth-card h2 span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .auth-card p{text-align:center;color:var(--ink-soft);font-size:13.5px;line-height:1.45;margin:6px 0 16px;}
+  .auth-card label[hidden]{display:none;}
+  .auth-card label, .acct-form{display:block;font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:12px;}
+  .auth-card input, .acct-form input{display:block;width:100%;margin-top:6px;padding:13px 14px;border:1.5px solid var(--line);border-radius:14px;
+    font-family:inherit;font-size:16px;color:var(--ink);background:#FAFBFF;transition:border-color .2s,box-shadow .2s;}
+  .acct-form input{margin:0 0 8px;}
+  .auth-card input:focus, .acct-form input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 4px rgba(61,90,254,.12);background:#fff;}
+  .auth-card .calloff-export{width:100%;margin:6px 0 0;font-size:15.5px;font-weight:700;}
+  .acct-form .calloff-export{width:100%;margin:4px 0 0;font-weight:700;}
+  .acct-msg{min-height:18px;margin-top:10px;text-align:center;font-size:13px;font-weight:600;color:var(--ink-soft);}
+  .acct-me b{display:block;font-size:17px;margin-top:6px;}
+  .acct-me span{font-size:13px;color:var(--ink-soft);}
+  .acct-btns{display:flex;gap:8px;}
+  .acct-btns .add-btn{margin-top:0;}
+  .acct-out{color:var(--danger);border-color:#F5C2C8;}
+  .tm-del{color:var(--danger);margin-left:6px;}
+  #team-list .sum-row{margin-bottom:8px;}
+
   @media (prefers-reduced-motion: reduce){
     *,*::before,*::after{animation:none !important;transition:none !important;}
   }
@@ -609,8 +645,9 @@
 
 <header>
   <div class="brand">
-    <div class="mark">
+    <div class="mark" role="button" aria-label="Account and sync">
       <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>
+      <span class="sync-dot off" id="sync-dot"></span>
     </div>
     <h1>Site <span>Progress</span></h1>
     <button id="dash-btn" aria-label="Dashboard">
@@ -690,6 +727,31 @@
     <button id="plan-in" aria-label="Zoom in">+</button>
   </div>
 </div>
+<!-- Sign in -->
+<div class="auth-overlay" id="auth-overlay" hidden>
+  <div class="auth-card">
+    <img src="icon-192.png" alt="" class="auth-logo" />
+    <h2 id="auth-title">Welcome <span>back</span></h2>
+    <p id="auth-sub"></p>
+    <label id="auth-name-row" hidden>Your name<input id="auth-name" autocomplete="name" /></label>
+    <label>Email<input id="auth-email" type="email" autocomplete="username" inputmode="email" /></label>
+    <label>Password<input id="auth-password" type="password" autocomplete="current-password" /></label>
+    <button class="calloff-export" id="auth-go" data-mode="signin">Sign in</button>
+    <div class="acct-msg" id="auth-msg"></div>
+  </div>
+</div>
+
+<!-- Account & team -->
+<div class="plan-overlay dash-overlay" id="acct-overlay" hidden>
+  <div class="plan-bar">
+    <button id="acct-close" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <span class="plan-title">Account <span style="color:var(--blue)">&amp; team</span></span>
+  </div>
+  <div class="dash-scroll" id="acct-body"></div>
+</div>
+
 <!-- Dashboard -->
 <div class="plan-overlay dash-overlay" id="dash-overlay" hidden>
   <div class="plan-bar">
@@ -708,7 +770,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 57 · 17 Oct";
+const BUILD = "build 58 · 18 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -1183,7 +1245,9 @@ function saveNow(){
     localStorage.setItem(COMPLETED_KEY, JSON.stringify(completed));
     localStorage.setItem(CALLOFF_KEY, JSON.stringify(calloffs));
     if(programData) localStorage.setItem(PROGRAM_KEY, JSON.stringify(programData));
+    else localStorage.removeItem(PROGRAM_KEY);
   }catch(e){ console.warn("save failed", e); }
+  if(typeof syncNoteLocalChange === "function") syncNoteLocalChange();
 }
 
 /* ============================================================
@@ -4121,6 +4185,7 @@ function importBackup(f){
     programData = d.programData || null;
     calloffs = d.calloffs || {};
     saveNow(); render();
+    if(syncReady) syncForceUpload().then(() => showToast("Backup restored and shared with the team"));
     showToast("Backup restored");
   }).catch(err => { console.warn(err); showToast("That's not a Site Progress backup file"); });
 }
@@ -4183,6 +4248,430 @@ try{  /* tidy the cache-busting query left by a self-update reload */
   if(location.search.indexOf("upd=") >= 0) history.replaceState(null, "", location.pathname);
 }catch(e){}
 checkForUpdate();
+
+/* ============================================================
+   Shared site data — sign-in, live sync across devices (Supabase)
+   Each part of the data (state, timeline, completed, call-offs,
+   programme) is one versioned document. Changes push straight
+   away; other devices get them live. If two devices change the
+   same document at once, the edits are merged item by item.
+   ============================================================ */
+const SB_URL = "https://exgtwsorllyzhohefowu.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV4Z3R3c29ybGx5emhvaGVmb3d1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIyODY0NjcsImV4cCI6MjEwNzg2MjQ2N30.ocVjQxWe4a9OUOhHecBHZbBKzRkhRdp5PZp-0prynnM";
+const SYNC_KEYS = ["state", "timeline", "completed", "calloffs", "programData"];
+const SYNC_META_KEY = "siteProgress.sync.v1";      /* { base: { key: { version, value } } } */
+
+var sb = null, me = null, syncReady = false, syncBusy = false, syncTimer = null, syncChannel = null;   /* var: saveNow may run before this line */
+var syncMeta = loadJSON(SYNC_META_KEY, { base: {} });
+let syncStatus = "off";                          /* off | ok | pending | offline | error */
+let lastSyncAt = null;
+
+function saveSyncMeta(){ try{ localStorage.setItem(SYNC_META_KEY, JSON.stringify(syncMeta)); }catch(e){ console.warn(e); } }
+const jsonEq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const clone = v => v === undefined ? undefined : JSON.parse(JSON.stringify(v));
+
+/* ---- local <-> shared shapes (open/closed panels stay per device) ---- */
+function stripUi(st){
+  return st.map(s => {
+    const { open, ...so } = s;
+    return Object.assign(so, { plots: s.plots.map(p => {
+      const { open: po, ...pp } = p;
+      return Object.assign(pp, { tasks: p.tasks.map(t => { const { noteOpen, ...tt } = t; return tt; }) });
+    }) });
+  });
+}
+function getLocal(key){
+  if(key === "state") return stripUi(state);
+  if(key === "timeline") return timeline;
+  if(key === "completed") return completed;
+  if(key === "calloffs") return calloffs;
+  if(key === "programData") return programData || {};
+}
+function setLocal(key, value){
+  if(key === "state"){
+    const openS = {}, openP = {}, openT = {};
+    state.forEach(s => { openS[s.id] = s.open; s.plots.forEach(p => { openP[p.id] = p.open; p.tasks.forEach(t => { openT[t.id] = t.noteOpen; }); }); });
+    state = normalize(clone(value) || []);
+    state.forEach(s => { s.open = !!openS[s.id]; s.plots.forEach(p => { p.open = !!openP[p.id]; p.tasks.forEach(t => { t.noteOpen = !!openT[t.id]; }); }); });
+  }
+  else if(key === "timeline") timeline = clone(value) || {};
+  else if(key === "completed") completed = Array.isArray(value) ? clone(value) : [];
+  else if(key === "calloffs") calloffs = clone(value) || {};
+  else if(key === "programData") programData = (value && Object.keys(value).length) ? clone(value) : null;
+}
+/* Merge one document. For the site state, a plot moved on one device while being edited on another
+   can end up in two flow stages; only copies the merge itself created are dropped (furthest stage kept). */
+function mergeDoc(key, b, l, r){
+  const m = merge3(b, l, r);
+  if(key !== "state" || !Array.isArray(m)) return m;
+  const count = st => { const c = {}; (st || []).forEach(s => { if(!s.basic && s.progNo) (s.plots || []).forEach(p => { c[p.name] = (c[p.name] || 0) + 1; }); }); return c; };
+  const cl = count(l), cr = count(r), cm = count(m);
+  Object.keys(cm).forEach(name => {
+    let extra = cm[name] - Math.max(cl[name] || 0, cr[name] || 0);
+    if(extra <= 0) return;
+    m.filter(s => !s.basic && s.progNo).sort((x, y) => x.progNo - y.progNo).forEach(s => {
+      if(extra <= 0) return;
+      const i = s.plots.findIndex(p => p.name === name);
+      if(i >= 0){ s.plots.splice(i, 1); extra--; }
+    });
+  });
+  return m;
+}
+
+/* ---- three-way merge: keep both devices' edits, item by item ---- */
+function itemKey(x){
+  if(!x || typeof x !== "object" || Array.isArray(x)) return null;
+  if(x.id != null) return "id:" + x.id;
+  if(x.trig != null && x.name != null) return "co:" + x.trig + "|" + x.name;
+  if(x.stage != null && x.task != null) return "ev:" + x.stage + "|" + x.task + "|" + x.at;
+  if(x.name != null && x.at != null) return "cp:" + x.name + "|" + x.at;
+  return null;
+}
+function merge3(b, l, r){
+  if(jsonEq(l, b)) return clone(r);
+  if(jsonEq(r, b)) return clone(l);
+  if(jsonEq(l, r)) return clone(l);
+  if(Array.isArray(l) && Array.isArray(r)) return mergeArr(Array.isArray(b) ? b : [], l, r);
+  const isObj = v => v && typeof v === "object" && !Array.isArray(v);
+  if(isObj(l) && isObj(r)){
+    const bb = isObj(b) ? b : {}, out = {};
+    new Set([...Object.keys(r), ...Object.keys(l)]).forEach(k => {
+      const inL = k in l, inR = k in r, inB = k in bb;
+      if(!inL && inB){ if(inR && !jsonEq(r[k], bb[k])) out[k] = clone(r[k]); return; }   /* deleted here */
+      if(!inR && inB){ if(inL && !jsonEq(l[k], bb[k])) out[k] = clone(l[k]); return; }   /* deleted there */
+      if(!inR){ out[k] = clone(l[k]); return; }
+      if(!inL){ out[k] = clone(r[k]); return; }
+      out[k] = merge3(bb[k], l[k], r[k]);
+    });
+    return out;
+  }
+  return clone(l);                                /* same value changed both sides: this device wins */
+}
+function mergeArr(b, l, r){
+  const all = [...b, ...l, ...r];
+  if(!all.length || all.some(x => itemKey(x) == null)) return jsonEq(l, b) ? clone(r) : clone(l);
+  const bm = new Map(b.map(x => [itemKey(x), x])), lm = new Map(l.map(x => [itemKey(x), x]));
+  const rm = new Map(r.map(x => [itemKey(x), x]));
+  const out = [];
+  r.forEach(x => {
+    const k = itemKey(x);
+    if(lm.has(k)) out.push(merge3(bm.get(k), lm.get(k), x));
+    else if(!bm.has(k) || !jsonEq(x, bm.get(k))) out.push(clone(x));   /* new there, or changed there */
+  });
+  l.forEach((x, i) => {                           /* new on this device: keep its position */
+    const k = itemKey(x);
+    if(rm.has(k) || bm.has(k)) return;
+    let at = out.length;
+    for(let j = i - 1; j >= 0; j--){
+      const pk = itemKey(l[j]), pos = out.findIndex(o => itemKey(o) === pk);
+      if(pos >= 0){ at = pos + 1; break; }
+    }
+    out.splice(at, 0, clone(x));
+  });
+  return out;
+}
+
+/* ---- status dot on the brand mark ---- */
+function setSyncStatus(s){
+  syncStatus = s;
+  const dot = document.getElementById("sync-dot");
+  if(dot){ dot.className = "sync-dot " + s; dot.title = syncStatusText(); }
+  const t = document.getElementById("acct-sync");
+  if(t) t.textContent = syncStatusText();
+}
+function syncStatusText(){
+  if(syncStatus === "ok") return "All changes synced" + (lastSyncAt ? " · " + new Date(lastSyncAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "");
+  if(syncStatus === "pending") return "Syncing…";
+  if(syncStatus === "offline") return "Offline — changes saved on this device and sync when you're back online";
+  if(syncStatus === "error") return "Sync problem — will keep retrying";
+  return "Not signed in";
+}
+
+/* ---- push / pull ---- */
+function dirtyKeys(){
+  return SYNC_KEYS.filter(k => { const b = syncMeta.base[k]; return !b || !jsonEq(getLocal(k), b.value); });
+}
+function syncNoteLocalChange(){
+  if(!syncReady) return;
+  clearTimeout(syncTimer);
+  if(dirtyKeys().length){ setSyncStatus(navigator.onLine === false ? "offline" : "pending"); syncTimer = setTimeout(syncPush, 800); }
+}
+async function syncPush(){
+  if(!syncReady || syncBusy) return;
+  if(navigator.onLine === false){ setSyncStatus("offline"); return; }
+  syncBusy = true;
+  let changedLocal = false;
+  try{
+    for(const k of dirtyKeys()){
+      for(let attempt = 0; attempt < 4; attempt++){
+        const local = clone(getLocal(k));
+        const base = syncMeta.base[k];
+        const { data, error } = await sb.rpc("save_doc", { p_key: k, p_value: local, p_base: base ? base.version : 0 });
+        if(error) throw error;
+        if(data.ok){ syncMeta.base[k] = { version: data.version, value: local }; break; }
+        /* someone else saved first: merge their version with ours, then try again */
+        const merged = mergeDoc(k, base ? base.value : undefined, local, data.value);
+        syncMeta.base[k] = { version: data.version, value: data.value };
+        setLocal(k, merged); changedLocal = true;
+      }
+    }
+    saveSyncMeta();
+    lastSyncAt = Date.now();
+    setSyncStatus(dirtyKeys().length ? "pending" : "ok");
+  }catch(e){
+    console.warn("sync push", e);
+    setSyncStatus(navigator.onLine === false ? "offline" : "error");
+    clearTimeout(syncTimer); syncTimer = setTimeout(syncPush, 15000);
+  }finally{
+    syncBusy = false;
+    if(changedLocal){ saveLocalOnly(); render(); }
+  }
+}
+async function syncPull(keys){
+  if(!syncReady) return;
+  const { data, error } = await sb.from("docs").select("key,version,value").in("key", keys || SYNC_KEYS);
+  if(error){ console.warn("sync pull", error); setSyncStatus(navigator.onLine === false ? "offline" : "error"); return; }
+  let changed = false;
+  data.forEach(row => {
+    const base = syncMeta.base[row.key];
+    if(base && base.version === row.version) return;
+    const local = getLocal(row.key);
+    const mine = !base || !jsonEq(local, base.value);
+    setLocal(row.key, mine && base ? mergeDoc(row.key, base.value, local, row.value) : row.value);
+    syncMeta.base[row.key] = { version: row.version, value: row.value };
+    changed = true;
+  });
+  saveSyncMeta();
+  if(changed){ saveLocalOnly(); render(); }
+  lastSyncAt = Date.now();
+  if(dirtyKeys().length) syncPush(); else setSyncStatus("ok");
+}
+/* write to this device only (no sync trigger) */
+function saveLocalOnly(){
+  const was = syncReady; syncReady = false;
+  try{ saveNow(); } finally { syncReady = was; }
+}
+
+/* first sync on this device after signing in */
+async function syncFirst(){
+  const { data, error } = await sb.from("docs").select("key,version,value");
+  if(error) throw error;
+  if(!data.length){                               /* nobody has uploaded yet: this device's data becomes the site data */
+    syncMeta.base = {};
+    saveSyncMeta();
+    await syncPush();
+    showToast("Site data uploaded — other devices will now see it");
+    return;
+  }
+  const hasBase = Object.keys(syncMeta.base).length > 0;
+  if(!hasBase){
+    const local = SYNC_KEYS.map(getLocal), remote = SYNC_KEYS.map(k => (data.find(d => d.key === k) || {}).value);
+    const differs = !jsonEq(local[0], remote[0]);
+    const localHasWork = overallCounts().done > 0;
+    try{ localStorage.setItem("siteProgress.preSyncBackup", JSON.stringify(backupData())); }catch(e){}
+    if(differs && localHasWork && isOwner() &&
+       confirm("This device has its own site data, and the shared site data is different.\n\nOK = REPLACE the shared data with this device's data (everyone will see this device's version)\nCancel = use the shared site data on this device (recommended)")){
+      for(const row of data) syncMeta.base[row.key] = { version: row.version, value: undefined };
+      saveSyncMeta();
+      await syncForceUpload();
+      return;
+    }
+  }
+  await syncPull();
+}
+/* overwrite the shared data with this device's data (used by restore-from-backup) */
+async function syncForceUpload(){
+  if(!syncReady) return;
+  const { data, error } = await sb.from("docs").select("key,version");
+  if(error){ showToast("Couldn't reach the server — try again"); return; }
+  data.forEach(row => { syncMeta.base[row.key] = { version: row.version, value: undefined }; });
+  syncBusy = false;
+  for(const k of SYNC_KEYS){
+    const local = clone(getLocal(k)), base = syncMeta.base[k];
+    const res = await sb.rpc("save_doc", { p_key: k, p_value: local, p_base: base ? base.version : 0 });
+    if(res.error){ showToast("Upload failed — try again"); return; }
+    if(res.data.ok) syncMeta.base[k] = { version: res.data.version, value: local };
+  }
+  saveSyncMeta();
+  lastSyncAt = Date.now();
+  setSyncStatus("ok");
+}
+
+function syncSubscribe(){
+  if(syncChannel) sb.removeChannel(syncChannel);
+  syncChannel = sb.channel("site-docs")
+    .on("postgres_changes", { event: "*", schema: "public", table: "docs" }, payload => {
+      const k = (payload.new && payload.new.key) || (payload.old && payload.old.key);
+      const v = payload.new && payload.new.version;
+      const base = syncMeta.base[k];
+      if(k && !(base && base.version === v)) syncPull([k]);
+    })
+    .subscribe();
+}
+
+/* ---- sign-in screen ---- */
+function isOwner(){ return !!(me && me.role === "owner"); }
+function showAuth(mode, msg){
+  const ov = document.getElementById("auth-overlay");
+  ov.hidden = false;
+  document.getElementById("auth-title").innerHTML = mode === "setup" ? "First-time <span>setup</span>" : "Welcome <span>back</span>";
+  document.getElementById("auth-sub").textContent = mode === "setup"
+    ? "Create the owner account for this site. Only the owner can add colleagues. Do this on the phone that has your up-to-date site data."
+    : "Sign in to see and update the site. Accounts are set up by the site owner.";
+  document.getElementById("auth-name-row").hidden = mode !== "setup";
+  document.getElementById("auth-go").textContent = mode === "setup" ? "Create owner account" : "Sign in";
+  document.getElementById("auth-go").dataset.mode = mode;
+  document.getElementById("auth-msg").textContent = msg || "";
+  document.getElementById("auth-password").autocomplete = mode === "setup" ? "new-password" : "current-password";
+}
+function hideAuth(){ document.getElementById("auth-overlay").hidden = true; }
+
+async function authSubmit(){
+  const btn = document.getElementById("auth-go");
+  const mode = btn.dataset.mode;
+  const email = document.getElementById("auth-email").value.trim().toLowerCase();
+  const password = document.getElementById("auth-password").value;
+  const name = document.getElementById("auth-name").value.trim();
+  const msg = document.getElementById("auth-msg");
+  if(!email || !password){ msg.textContent = "Enter your email and password"; return; }
+  btn.disabled = true; msg.textContent = mode === "setup" ? "Creating account…" : "Signing in…";
+  try{
+    if(mode === "setup"){
+      const { data, error } = await sb.functions.invoke("team", { body: { action: "bootstrap", email, password, name } });
+      if(error || (data && data.error)) throw new Error((data && data.error) || await fnError(error));
+    }
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if(error) throw new Error(error.message === "Invalid login credentials" ? "Wrong email or password" : error.message);
+    document.getElementById("auth-password").value = "";
+    await afterSignIn();
+  }catch(e){
+    msg.textContent = e.message || "Something went wrong — check your connection";
+  }finally{ btn.disabled = false; }
+}
+async function fnError(error){
+  try{ const j = await error.context.json(); return j.error || error.message; }catch(e){ return error && error.message || "Server error"; }
+}
+
+async function afterSignIn(){
+  const { data: { session } } = await sb.auth.getSession();
+  if(!session){ showAuth("signin"); return; }
+  const cachedMe = loadJSON("siteProgress.me.v1", null);
+  const { data, error } = await sb.from("members").select("user_id,email,name,role").eq("user_id", session.user.id).maybeSingle();
+  if(error){
+    /* offline: carry on with the last known account, sync when back online */
+    if(cachedMe && cachedMe.user_id === session.user.id){ me = cachedMe; hideAuth(); syncReady = true; setSyncStatus("offline"); return; }
+    showAuth("signin", "Can't reach the server — check your connection"); return;
+  }
+  if(!data){
+    await sb.auth.signOut();
+    showAuth("signin", "This account isn't on the site team — ask the site owner.");
+    return;
+  }
+  me = data;
+  try{ localStorage.setItem("siteProgress.me.v1", JSON.stringify(me)); }catch(e){}
+  hideAuth();
+  syncReady = true;
+  setSyncStatus("pending");
+  try{
+    await syncFirst();
+    syncSubscribe();
+  }catch(e){ console.warn(e); setSyncStatus("error"); }
+}
+
+async function syncInit(){
+  if(!window.supabase){ setSyncStatus("error"); showAuth("signin", "Couldn't load sign-in — check your connection and reopen the app"); return; }
+  sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: "siteProgress.auth" } });
+  document.getElementById("auth-go").onclick = authSubmit;
+  document.getElementById("auth-password").addEventListener("keydown", e => { if(e.key === "Enter") authSubmit(); });
+  sb.auth.onAuthStateChange((ev) => { if(ev === "SIGNED_OUT"){ syncReady = false; me = null; setSyncStatus("off"); } });
+  const { data: { session } } = await sb.auth.getSession();
+  if(session){ await afterSignIn(); return; }
+  let setup = false;
+  try{ const r = await sb.rpc("bootstrap_open"); setup = r.data === true; }catch(e){}
+  showAuth(setup ? "setup" : "signin");
+}
+
+window.addEventListener("online", () => { if(syncReady){ syncPull(); } });
+window.addEventListener("offline", () => { if(syncReady) setSyncStatus("offline"); });
+document.addEventListener("visibilitychange", () => { if(!document.hidden && syncReady) syncPull(); });
+setInterval(() => { if(syncReady && !document.hidden) syncPull(); }, 60000);
+
+/* ---- account & team sheet (tap the logo) ---- */
+async function openAccount(){
+  if(!me){ showAuth("signin"); return; }
+  const ov = document.getElementById("acct-overlay");
+  ov.hidden = false;
+  document.body.style.overflow = "hidden";
+  renderAccount();
+}
+function closeAccount(){ document.getElementById("acct-overlay").hidden = true; document.body.style.overflow = ""; }
+async function renderAccount(){
+  const body = document.getElementById("acct-body");
+  let h = '<div class="dash-card"><h3>Signed <em>in</em></h3>' +
+    '<div class="acct-me"><b>' + dashEsc(me.name || me.email) + '</b><span>' + dashEsc(me.email) + ' · ' + (isOwner() ? "Site owner" : "Team member") + '</span></div>' +
+    '<div class="dash-sub" id="acct-sync">' + dashEsc(syncStatusText()) + '</div>' +
+    '<div class="acct-btns"><button class="add-btn" id="acct-syncnow">Sync now</button><button class="add-btn acct-out" id="acct-signout">Sign out</button></div></div>';
+  if(isOwner()){
+    h += '<div class="dash-card"><h3>Site <em>team</em></h3><div class="dash-sub">Only you can add or remove people. Give each colleague their email and the password you set — they sign in with it on their phone.</div><div id="team-list" class="dash-empty">Loading…</div>' +
+      '<div class="acct-form"><input id="tm-name" placeholder="Name" autocomplete="off" />' +
+      '<input id="tm-email" type="email" placeholder="Email" autocomplete="off" />' +
+      '<input id="tm-pass" type="text" placeholder="Password (min 8 characters)" autocomplete="off" />' +
+      '<button class="calloff-export" id="tm-add">Add colleague</button><div class="acct-msg" id="tm-msg"></div></div></div>';
+  }
+  body.innerHTML = h;
+  document.getElementById("acct-syncnow").onclick = async () => { setSyncStatus("pending"); await syncPush(); await syncPull(); };
+  document.getElementById("acct-signout").onclick = async () => {
+    if(!confirm("Sign out of Site Progress on this device?")) return;
+    await sb.auth.signOut();
+    try{ localStorage.removeItem("siteProgress.me.v1"); }catch(e){}
+    closeAccount(); showAuth("signin");
+  };
+  if(!isOwner()) return;
+  document.getElementById("tm-add").onclick = async () => {
+    const msg = document.getElementById("tm-msg");
+    const name = document.getElementById("tm-name").value.trim(), email = document.getElementById("tm-email").value.trim();
+    const password = document.getElementById("tm-pass").value;
+    msg.textContent = "Adding…";
+    const { data, error } = await sb.functions.invoke("team", { body: { action: "create", name, email, password } });
+    if(error || (data && data.error)){ msg.textContent = (data && data.error) || await fnError(error); return; }
+    msg.textContent = "Added — " + email + " can now sign in with that password.";
+    ["tm-name","tm-email","tm-pass"].forEach(id => document.getElementById(id).value = "");
+    loadTeam();
+  };
+  loadTeam();
+}
+async function loadTeam(){
+  const box = document.getElementById("team-list");
+  if(!box) return;
+  let { data, error } = await sb.from("members").select("user_id,email,name,role,created_at").order("created_at");
+  if(error){ box.textContent = "Couldn't load the team — are you online?"; return; }
+  box.className = "";
+  data = data || [];
+  box.innerHTML = data.map(m => '<div class="sum-row"><div class="sum-info"><div class="sum-name">' + dashEsc(m.name || m.email) + '</div>' +
+    '<div class="sum-meta">' + dashEsc(m.email) + ' · ' + (m.role === "owner" ? "Owner" : "Member") + '</div></div>' +
+    (m.role === "owner" ? '' : '<button class="sum-restore" data-pw="' + m.user_id + '">Password</button><button class="sum-restore tm-del" data-del="' + m.user_id + '">Remove</button>') +
+    '</div>').join("");
+  box.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+    const m = data.find(x => x.user_id === b.dataset.del);
+    if(!confirm("Remove " + (m.name || m.email) + " from the site team? They won't be able to sign in any more.")) return;
+    const { data: r, error } = await sb.functions.invoke("team", { body: { action: "remove", user_id: m.user_id } });
+    if(error || (r && r.error)){ showToast((r && r.error) || await fnError(error)); return; }
+    showToast((m.name || m.email) + " removed"); loadTeam();
+  });
+  box.querySelectorAll("[data-pw]").forEach(b => b.onclick = async () => {
+    const m = data.find(x => x.user_id === b.dataset.pw);
+    const pw = prompt("New password for " + (m.name || m.email) + " (min 8 characters):");
+    if(!pw) return;
+    const { data: r, error } = await sb.functions.invoke("team", { body: { action: "reset_password", user_id: m.user_id, password: pw } });
+    if(error || (r && r.error)){ showToast((r && r.error) || await fnError(error)); return; }
+    showToast("Password changed — tell " + (m.name || m.email));
+  });
+}
+document.getElementById("acct-close").onclick = closeAccount;
+document.querySelector(".brand .mark").onclick = openAccount;
+document.querySelector(".brand h1").onclick = openAccount;
+
+syncInit();
 </script>
 </body>
 </html>
