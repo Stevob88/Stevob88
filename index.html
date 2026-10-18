@@ -276,6 +276,8 @@
   .summary .summary-title{display:flex;align-items:center;gap:10px;}
   .summary-ico{display:flex;flex-shrink:0;width:34px;height:34px;border-radius:11px;align-items:center;justify-content:center;background:var(--blue-soft);}
   .summary-ico svg{width:19px;height:19px;}
+  .stage-ico{color:var(--blue);background:var(--blue-soft);}
+  .stage-ico.basic{color:var(--green);background:var(--green-soft);}
   .completed-summary .summary-ico{color:var(--green);background:var(--green-soft);}
   .logs-summary .summary-ico{color:var(--blue);}
   .summary-name{font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:-.4px;}
@@ -794,7 +796,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 63 · 18 Oct";
+const BUILD = "build 64 · 18 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -2772,6 +2774,29 @@ function renderOverall(){
   document.getElementById("overall-fill").style.width = p + "%";
 }
 
+/* one line icon per stage, picked from its name (custom stages get a hard hat) */
+const SVG = d => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>';
+const STAGE_ICONS = [
+  [/foundation/i,   SVG('<path d="M3 21h18"/><path d="M5 21v-5h14v5"/><path d="M8 16V9h8v7"/><path d="M12 9V4"/><path d="M9.5 6.5 12 4l2.5 2.5"/>')],
+  [/substructure/i, SVG('<path d="M3 19h18"/><rect x="4" y="11" width="16" height="8" rx="1"/><path d="M4 15h16M9 11v4M15 11v4M12 15v4M7 15v4M17 15v4"/><path d="M3 8h18"/>')],
+  [/superstructure|timber|frame/i, SVG('<path d="M4 21V9l8-6 8 6v12"/><path d="M4 21h16"/><path d="M9 21v-8h6v8"/><path d="M4 13l5 0M15 13h5M12 3v6"/>')],
+  [/brick/i,        SVG('<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M3 9.7h18M3 14.3h18M9 5v4.7M15 5v4.7M6 9.7v4.6M12 9.7v4.6M18 9.7v4.6M9 14.3V19M15 14.3V19"/>')],
+  [/roof/i,         SVG('<path d="M2 12 12 4l10 8"/><path d="M5 10v10h14V10"/><path d="M6.5 13.5h11M8 16.5h8"/>')],
+  [/1st fix|first fix/i, SVG('<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>')],
+  [/plaster/i,      SVG('<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M4 9h16M4 15h16M12 3v18"/>')],
+  [/2nd fix|second fix/i, SVG('<rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="9.5" cy="10" r=".9"/><circle cx="14.5" cy="10" r=".9"/><path d="M10 15h4"/>')],
+  [/paint|decorat/i, SVG('<rect x="3" y="3" width="15" height="6" rx="1.5"/><path d="M18 6h2.5v5H11v3"/><rect x="9.5" y="14" width="3" height="7" rx="1"/>')],
+  [/final/i,        SVG('<circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 9.2-9.2M17 6l2 2M15 8l1.5 1.5"/>')],
+  [/fire/i,         SVG('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><path d="M12 10.5c1.6 1.6 2.2 2.6 2.2 3.6a2.2 2.2 0 0 1-4.4 0c0-.9.5-1.6 1-2.1.2.7.6 1 1 1 .2-.9.1-1.7.2-2.5z"/>')],
+  [/apartment|communal|flat/i, SVG('<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M11 21v-3h2v3"/>')],
+  [/general|list|note/i, SVG('<path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"/>')],
+];
+const STAGE_ICON_DEFAULT = SVG('<path d="M4 16a8 8 0 0 1 16 0"/><path d="M2 16h20v2H2z"/><path d="M10 8V5h4v3"/>');
+function stageIcon(stage){
+  const hit = STAGE_ICONS.find(([re]) => re.test(stage.name || ""));
+  return hit ? hit[1] : STAGE_ICON_DEFAULT;
+}
+
 function renderStage(stage){
   const el = document.createElement("div");
   el.className = "stage" + (stage.open ? " open" : "");
@@ -2803,6 +2828,10 @@ function renderStage(stage){
     chip.textContent = p + "%";
   }
 
+  const ico = document.createElement("span");
+  ico.className = "summary-ico stage-ico" + (stage.basic ? " basic" : "");
+  ico.innerHTML = stageIcon(stage);
+  head.appendChild(ico);
   head.appendChild(title);
   head.appendChild(chip);
   head.onclick = () => { stage.open = !stage.open; save(); el.classList.toggle("open", stage.open); };
