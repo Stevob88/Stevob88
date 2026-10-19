@@ -604,7 +604,7 @@
   #today-btn:active{transform:scale(.93);}
   #today-btn svg{width:18px;height:18px;}
   #today-btn ~ #dash-btn{margin-left:0;}
-  .td-tabs{display:grid;grid-template-columns:1fr 1fr;background:#fff;border-radius:99px;padding:4px;box-shadow:var(--shadow);margin-bottom:12px;}
+  .td-tabs{display:grid;grid-template-columns:1fr 1fr 1fr;background:#fff;border-radius:99px;padding:4px;box-shadow:var(--shadow);margin-bottom:12px;}
   .td-tabs button{border:none;background:transparent;font:inherit;font-size:14px;font-weight:800;color:var(--ink-soft);padding:9px 0;border-radius:99px;cursor:pointer;}
   .td-tabs button.on{background:var(--grad);color:#fff;box-shadow:var(--glow);}
   .wk-grid{display:grid;gap:3px;align-items:center;margin-top:4px;}
@@ -624,6 +624,20 @@
   .wk-legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
   .wk-legend i.lo{background:rgba(9,132,227,.2);} .wk-legend i.hi{background:rgba(9,132,227,.95);} .wk-legend i.hot{background:#E0485A;}
   .wk-detail{margin-top:12px;padding:10px 12px;background:var(--bg);border-radius:14px;font-size:13px;}
+  .chg-weeks{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 12px;}
+  .chg-weeks button{border:none;background:var(--bg);font:inherit;font-size:12px;font-weight:700;color:var(--ink-soft);padding:6px 12px;border-radius:99px;cursor:pointer;}
+  .chg-weeks button.on{background:var(--blue-soft);color:var(--blue);}
+  .chg-kpis{margin-bottom:6px;}
+  .chg-kpis b.slip{color:#D23C4E;} .chg-kpis b.fwd{color:#00A19D;} .chg-kpis b.new{color:var(--blue);} .chg-kpis b.gone{color:var(--ink-soft);}
+  .dash-card h3 em.slip{color:#D23C4E;} .dash-card h3 em.fwd{color:#00A19D;} .dash-card h3 em.gone{color:var(--ink-soft);}
+  .chg-li{display:flex;align-items:flex-start;gap:9px;margin-top:7px;}
+  .chg-li .ic{width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;}
+  .ic.slip{background:#FDE6E9;color:#D23C4E;} .ic.fwd{background:#DDF7F6;color:#00A19D;} .ic.new{background:var(--blue-soft);color:var(--blue);} .ic.gone{background:#EEF1F5;color:#5E6A75;}
+  .chg-t{flex:1;font-size:13px;line-height:1.3;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;}
+  .chg-t b{font-weight:800;}
+  .chg-t small{flex-basis:100%;order:3;font-size:12px;color:var(--ink-soft);font-weight:500;}
+  .chg-t em{margin-left:auto;font-style:normal;font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:99px;}
+  .chg-t em.slip{background:#FDE6E9;color:#D23C4E;} .chg-t em.fwd{background:#DDF7F6;color:#00A19D;}
   .td-sync{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600;color:var(--ink-soft);margin:0 2px 12px;}
   .td-sync span{flex:1;line-height:1.3;}
   .td-syncbtn{border:none;border-radius:99px;background:var(--blue-soft);color:var(--blue);font:inherit;font-weight:800;font-size:12.5px;padding:8px 14px;cursor:pointer;}
@@ -920,7 +934,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 72 · 19 Oct";
+const BUILD = "build 73 · 19 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -4979,9 +4993,18 @@ function renderToday(){
     return;
   }
   const tabs = '<div class="td-tabs"><button data-tab="today"' + (todayTab === "today" ? ' class="on"' : '') + '>Today</button>' +
-               '<button data-tab="week"' + (todayTab === "week" ? ' class="on"' : '') + '>2 weeks</button></div>';
+               '<button data-tab="week"' + (todayTab === "week" ? ' class="on"' : '') + '>2 weeks</button>' +
+               '<button data-tab="chg"' + (todayTab === "chg" ? ' class="on"' : '') + '>Changes</button></div>';
   const bindTabs = () => body.querySelectorAll(".td-tabs button").forEach(b => b.onclick = () => { todayTab = b.dataset.tab; renderToday(); body.scrollTop = 0; });
-  document.getElementById("today-title").innerHTML = todayTab === "week" ? 'Two weeks <span style="color:var(--blue)">by trade</span>' : 'Today <span style="color:var(--blue)">on site</span>';
+  document.getElementById("today-title").innerHTML = todayTab === "week" ? 'Two weeks <span style="color:var(--blue)">by trade</span>'
+    : todayTab === "chg" ? 'Programme <span style="color:var(--blue)">changes</span>' : 'Today <span style="color:var(--blue)">on site</span>';
+  if(todayTab === "chg"){
+    body.innerHTML = syncBar + tabs + renderChangesBody(prog);
+    document.getElementById("td-sync").onclick = e => progSyncNow(e.currentTarget);
+    bindTabs(); bindChangesBody(body);
+    body.querySelectorAll("[data-plot]").forEach(el => el.onclick = e => { e.stopPropagation(); jumpToPlot(el.dataset.plot); });
+    return;
+  }
   if(todayTab === "week"){
     body.innerHTML = syncBar + tabs + renderWeekBody(prog);
     document.getElementById("td-sync").onclick = e => progSyncNow(e.currentTarget);
@@ -5306,6 +5329,103 @@ function bindWeekBody(body){
   const more = body.querySelector(".wk-more");
   if(more) more.onclick = () => { weekAllTrades = !weekAllTrades; const y = body.scrollTop; renderToday(); body.scrollTop = y; };
   body.querySelectorAll(".td-seg button[data-w]").forEach(b => b.onclick = () => { weekSel = +b.dataset.w; const y = body.scrollTop; renderToday(); body.scrollTop = y; });
+}
+
+/* ============================================================
+   What changed — the programme now against the first copy saved
+   in an earlier week (the server keeps one per week, last 6)
+   ============================================================ */
+let chgBase = null, chgShowAll = {};
+/* signed working days from a to b (b later = positive) */
+function progShift(a, b, prog){
+  if(a === b) return 0;
+  return a < b ? progWorkDays(a, b, prog) - (progWorking(isoToDate(a), prog) ? 1 : 0)
+               : -(progWorkDays(b, a, prog) - (progWorking(isoToDate(b), prog) ? 1 : 0));
+}
+function chgWeeks(prog){
+  const today = isoLocal(new Date());
+  return Object.keys(prog.weeks || {}).filter(k => k <= today).sort();
+}
+function changesData(prog){
+  const weeks = chgWeeks(prog);
+  if(!weeks.length) return null;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const thisMon = new Date(now); thisMon.setDate(thisMon.getDate() - ((thisMon.getDay() + 6) % 7));
+  const thisWk = isoLocal(thisMon);
+  let key = chgBase && weeks.includes(chgBase) ? chgBase : null;
+  if(!key){ const before = weeks.filter(k => k < thisWk); key = before.length ? before[before.length - 1] : weeks[weeks.length - 1]; }
+  const snap = prog.weeks[key];
+  const cur = new Map(prog.acts.map(a => [a.i, a]));
+  const base = new Map();
+  (snap.acts || []).forEach(r => {
+    if(r.length >= 6) base.set(r[0], { p: r[1], l: r[2], s: r[3], e: r[4], st: r[5] });
+    else { const c = cur.get(r[0]); base.set(r[0], { p: c ? c.p : "?", l: c ? (c.l || c.t) : "A programme bar", s: r[1], e: r[2], st: r[3] }); }
+  });
+  const slipped = [], forward = [], added = [], removed = [];
+  const keep = (e1, e2) => (e1 > e2 ? e1 : e2) >= key;              /* ignore bars long finished before that copy */
+  cur.forEach((a, id) => {
+    const b = base.get(id);
+    if(!b){ if(keep(a.e, a.e)) added.push({ a }); return; }
+    if(!keep(a.e, b.e)) return;
+    const de = progShift(b.e, a.e, prog), ds = progShift(b.s, a.s, prog);
+    const by = de || ds;
+    if(!by) return;
+    (by > 0 ? slipped : forward).push({ a, b, by, startOnly: !de });
+  });
+  base.forEach((b, id) => { if(!cur.has(id) && keep(b.e, b.e)) removed.push({ b }); });
+  return { key, weeks, snapAt: snap.at, slipped, forward, added, removed, thisWk };
+}
+function renderChangesBody(prog){
+  const c = changesData(prog);
+  if(!c) return '<div class="dash-card"><div class="dash-empty">No saved copy of the programme yet — the first one is kept on the next sync.</div></div>';
+  const fmt = s => progDayLabel(s, { weekday: "short", day: "numeric", month: "short" });
+  let h = '';
+  /* which copy to compare with */
+  h += '<div class="dash-card"><h3>What <em>changed</em></h3><div class="dash-sub">The programme now, against the copy saved on ' +
+       dashEsc(new Date(c.snapAt).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })) + '</div>';
+  if(c.weeks.length > 1){
+    h += '<div class="chg-weeks">' + c.weeks.slice().reverse().map(k => '<button data-k="' + k + '"' + (k === c.key ? ' class="on"' : '') + '>' +
+      (k === c.thisWk ? 'This week' : 'w/c ' + dashEsc(progDayLabel(k, { day: "numeric", month: "short" }))) + '</button>').join("") + '</div>';
+  }
+  h += '<div class="dash-kpis chg-kpis">' +
+    '<div class="dash-kpi"><b class="slip">' + c.slipped.length + '</b><span>Slipped</span></div>' +
+    '<div class="dash-kpi"><b class="fwd">' + c.forward.length + '</b><span>Pulled forward</span></div>' +
+    '<div class="dash-kpi"><b class="new">' + c.added.length + '</b><span>New</span></div>' +
+    '<div class="dash-kpi"><b class="gone">' + c.removed.length + '</b><span>Taken off</span></div></div>';
+  const none = !c.slipped.length && !c.forward.length && !c.added.length && !c.removed.length;
+  if(none){
+    const next = new Date(isoToDate(c.thisWk)); next.setDate(next.getDate() + 7);
+    h += '<div class="dash-empty">No changes since that copy.' + (c.key === c.thisWk && c.weeks.length === 1
+      ? ' The first week-on-week comparison will be ready from ' + dashEsc(next.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" })) + '.' : '') + '</div>';
+  }
+  h += '</div>';
+
+  const section = (id, title, em, cls, items, line) => {
+    if(!items.length) return '';
+    const by = {};
+    items.forEach(x => { const p = (x.a || x.b).p; (by[p] = by[p] || []).push(x); });
+    const nos = Object.keys(by).sort(progPlotOrder);
+    const all = chgShowAll[id], shown = all ? nos : nos.slice(0, 12);
+    let s = '<div class="dash-card"><h3>' + title + ' <em class="' + cls + '">' + em + '</em><span class="td-cnt">' + items.length + '</span></h3>';
+    shown.forEach(no => {
+      s += '<div class="td-row chg-row" data-plot="' + dashEsc("Plot " + no) + '"><div class="td-rh">' + todayPlotHead(no, prog) + '</div>' +
+        by[no].map(x => '<div class="chg-li"><span class="ic ' + cls + '">' + ({ slip: "↘", fwd: "↗", new: "+", gone: "−" }[cls]) + '</span><span class="chg-t">' + line(x) + '</span></div>').join("") + '</div>';
+    });
+    if(nos.length > 12) s += '<button class="wk-more" data-more="' + id + '">' + (all ? 'Show fewer' : 'Show all ' + nos.length + ' plots') + '</button>';
+    return s + '</div>';
+  };
+  const job = x => '<b>' + dashEsc((x.a ? x.a.l || x.a.t : x.b.l) || "Activity") + '</b>';
+  const moved = x => job(x) + '<small>' + (x.startOnly ? 'start ' + dashEsc(fmt(x.b.s)) + ' → ' + dashEsc(fmt(x.a.s)) : 'finish ' + dashEsc(fmt(x.b.e)) + ' → ' + dashEsc(fmt(x.a.e))) + '</small>' +
+    '<em class="' + (x.by > 0 ? 'slip' : 'fwd') + '">' + (x.by > 0 ? '+' : '−') + Math.abs(x.by) + (Math.abs(x.by) === 1 ? ' day' : ' days') + '</em>';
+  h += section("slip", "Slipped", "later", "slip", c.slipped.sort((p, q) => q.by - p.by), moved);
+  h += section("fwd", "Pulled", "forward", "fwd", c.forward.sort((p, q) => p.by - q.by), moved);
+  h += section("new", "New on the", "programme", "new", c.added, x => job(x) + '<small>' + dashEsc(fmt(x.a.s)) + (x.a.s !== x.a.e ? ' – ' + dashEsc(fmt(x.a.e)) : '') + '</small>');
+  h += section("gone", "Taken", "off", "gone", c.removed, x => job(x) + '<small>was ' + dashEsc(fmt(x.b.s)) + (x.b.s !== x.b.e ? ' – ' + dashEsc(fmt(x.b.e)) : '') + '</small>');
+  return h;
+}
+function bindChangesBody(body){
+  body.querySelectorAll(".chg-weeks button").forEach(b => b.onclick = () => { chgBase = b.dataset.k; chgShowAll = {}; renderToday(); });
+  body.querySelectorAll("[data-more]").forEach(b => b.onclick = e => { e.stopPropagation(); chgShowAll[b.dataset.more] = !chgShowAll[b.dataset.more]; const y = body.scrollTop; renderToday(); body.scrollTop = y; });
 }
 
 function openPlan(){
