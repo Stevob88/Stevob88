@@ -815,7 +815,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 68 · 19 Oct";
+const BUILD = "build 69 · 19 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -5193,6 +5193,22 @@ function syncNoteLocalChange(){
   clearTimeout(syncTimer);
   if(dirtyKeys().length){ setSyncStatus(navigator.onLine === false ? "offline" : "pending"); syncTimer = setTimeout(syncPush, 800); }
 }
+/* Never redraw under someone's fingers: while a text box in the app has focus, incoming changes
+   wait until they leave it (a redraw would replace the box and iOS drops the keyboard). */
+function userTyping(){
+  const a = document.activeElement;
+  if(!a) return false;
+  const textual = (a.tagName === "INPUT" && !/^(file|date|checkbox|radio|button)$/i.test(a.type)) || a.tagName === "TEXTAREA";
+  return textual && !!a.closest("#app, .dash-scroll");
+}
+var syncPullPending = false;
+document.addEventListener("focusout", () => setTimeout(() => {
+  if(syncReady && !userTyping()){
+    if(syncPullPending){ syncPullPending = false; syncPull(); }
+    else if(dirtyKeys().length) syncPush();
+  }
+}, 350));
+
 async function syncPush(){
   if(!syncReady || syncBusy) return;
   if(navigator.onLine === false){ setSyncStatus("offline"); return; }
@@ -5206,7 +5222,9 @@ async function syncPush(){
         const { data, error } = await sb.rpc("save_doc", { p_key: k, p_value: local, p_base: base ? base.version : 0 });
         if(error) throw error;
         if(data.ok){ syncMeta.base[k] = { version: data.version, value: local }; break; }
-        /* someone else saved first: merge their version with ours, then try again */
+        /* someone else saved first: merge their version with ours, then try again —
+           but not while typing; leave it for when the text box is let go */
+        if(userTyping()){ syncPullPending = true; break; }
         const merged = mergeDoc(k, base ? base.value : undefined, local, data.value);
         syncMeta.base[k] = { version: data.version, value: data.value };
         setLocal(k, merged); changedLocal = true;
@@ -5222,16 +5240,20 @@ async function syncPush(){
   }finally{
     syncBusy = false;
     if(changedLocal){ saveLocalOnly(); render(); }
+    /* a live update that arrived mid-save (often just the echo of this save) */
+    if(syncPullPending && !userTyping()){ syncPullPending = false; syncPull(); }
   }
 }
 async function syncPull(keys){
   if(!syncReady) return;
+  if(syncBusy || userTyping()){ syncPullPending = true; return; }
   const { data, error } = await sb.from("docs").select("key,version,value").in("key", keys || SYNC_KEYS);
   if(error){ console.warn("sync pull", error); setSyncStatus(navigator.onLine === false ? "offline" : "error"); return; }
+  if(syncBusy || userTyping()){ syncPullPending = true; return; }   /* started typing or saving while fetching */
   let changed = false;
   data.forEach(row => {
     const base = syncMeta.base[row.key];
-    if(base && base.version === row.version) return;
+    if(base && row.version <= base.version) return;              /* nothing newer than what we have */
     const local = getLocal(row.key);
     const mine = !base || !jsonEq(local, base.value);
     setLocal(row.key, mine && base ? mergeDoc(row.key, base.value, local, row.value) : row.value);
