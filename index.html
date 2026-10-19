@@ -614,6 +614,15 @@
   .task .icon-btn svg{width:16px;height:16px;}
   .task{gap:8px;}
   .todo-row .due-where{font-size:12.5px;color:var(--ink-soft);margin-top:1px;}
+  .assign-btn{position:relative;overflow:hidden;}
+  .assign-btn select{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:none;font-size:16px;cursor:pointer;}
+  .icon-btn.assigned{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .assign-chip{display:inline-block;margin:4px 6px 0 0;font-size:12px;font-weight:700;padding:3px 10px;border-radius:99px;background:var(--blue-soft);color:var(--blue);}
+  .assign-chip::before{content:"→ ";}
+  .assign-chip.mgr{background:#EEF1F5;color:#3C4650;}
+  .trade-bar{display:flex;gap:8px;align-items:center;margin:0 0 6px;}
+  .trade-bar .calloff-export{margin:0;flex:0 0 auto;width:auto;padding:11px 16px;}
+  .trade-sel{flex:1;min-width:0;padding:11px 12px;border:1.5px solid var(--line);border-radius:14px;font-family:inherit;font-size:15px;font-weight:600;color:var(--ink);background:#F9FAFC;}
   .icon-btn.todo-on{background:var(--green-light);border-color:var(--green-light);color:#fff;}
   .todo-summary .summary-ico{color:var(--green);background:var(--green-soft);}
   .todo-row .task-main{padding-top:2px;}
@@ -806,7 +815,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 66 · 18 Oct";
+const BUILD = "build 67 · 19 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -814,6 +823,7 @@ const BUILD = "build 66 · 18 Oct";
 const ICON = {
   chev:  '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>',
+  person:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
   flag:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg>',
   note:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"/><path d="M4 10h16"/><path d="M4 15h9"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/><path d="M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13"/></svg>',
@@ -906,7 +916,14 @@ const COMPLETED_KEY = "siteProgress.completed.v1"; /* [ { name, at, plot } ] */
 const PROGRAM_KEY = "siteProgress.programMeta.v1"; /* { uploadedAt, window, counts } */
 const RESTORE_FLAG = "siteProgress.restoredMissing.v1";
 const CALLOFF_KEY = "siteProgress.calloffs.v1";
-const PLOTINFO_KEY = "siteProgress.plotInfo.v1";   /* the site's plot schedule: headers, groups, plots, legend */   /* { plotName: [ {trig, name, wc, done, doneAt} ] } */
+const PLOTINFO_KEY = "siteProgress.plotInfo.v1";
+const SETTINGS_KEY = "siteProgress.settings.v1";   /* { trades: [], managers: [], noticeHours } */
+const DEFAULT_SETTINGS = {
+  trades: ["Groundworker","Bricklayer","Scaffolder","Timber Frame","Roofer","Joiner","Electrician","Plumber",
+           "Boarder","Taper","Painter","Wall Tiler","Kitchen Fitter","Mastic","Cleaner","Landscaper"],
+  managers: ["Site Manager","Assistant Site Manager"],
+  noticeHours: 48
+};   /* the site's plot schedule: headers, groups, plots, legend */   /* { plotName: [ {trig, name, wc, done, doneAt} ] } */
 
 let state = load();
 let timeline = loadJSON(TIMELINE_KEY, {});
@@ -914,6 +931,7 @@ let completed = loadJSON(COMPLETED_KEY, []);
 let programData = loadJSON(PROGRAM_KEY, null);
 let calloffs = loadJSON(CALLOFF_KEY, {});
 let plotInfo = loadJSON(PLOTINFO_KEY, null);
+let settings = Object.assign({}, DEFAULT_SETTINGS, loadJSON(SETTINGS_KEY, {}));
 let completedOpen = false, logsOpen = false, dueOpen = false, progOpen = false, calloffOpen = false, calloffShowDone = false;
 const calloffPlotsOpen = new Set();
 const logsExpanded = new Set();
@@ -1268,7 +1286,8 @@ function normalize(stages){
         due: t.due || null,
         note: t.note || "",
         noteOpen: !!t.noteOpen,
-        todo: (t.todo && typeof t.todo === "object" && Object.keys(t.todo).length) ? t.todo : undefined
+        todo: (t.todo && typeof t.todo === "object" && Object.keys(t.todo).length) ? t.todo : undefined,
+        assignee: t.assignee || undefined
       }))
     }))
   }));
@@ -1286,6 +1305,7 @@ function saveNow(){
     localStorage.setItem(COMPLETED_KEY, JSON.stringify(completed));
     localStorage.setItem(CALLOFF_KEY, JSON.stringify(calloffs));
     if(plotInfo) localStorage.setItem(PLOTINFO_KEY, JSON.stringify(plotInfo)); else localStorage.removeItem(PLOTINFO_KEY);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     if(programData) localStorage.setItem(PROGRAM_KEY, JSON.stringify(programData));
     else localStorage.removeItem(PROGRAM_KEY);
   }catch(e){
@@ -2640,6 +2660,149 @@ function renderTodoSection(){
   return el;
 }
 
+/* ---- General items: allocate to a trade or site manager, and send each trade its list ---- */
+function assignButton(task){
+  const wrap = document.createElement("label");
+  wrap.className = "icon-btn assign-btn" + (task.assignee ? " assigned" : "");
+  wrap.innerHTML = ICON.person;
+  wrap.setAttribute("aria-label", "Allocate to a trade or site manager");
+  const sel = document.createElement("select");
+  const opt = (v, t) => { const o = document.createElement("option"); o.value = v; o.textContent = t; return o; };
+  sel.appendChild(opt("", "— Not allocated —"));
+  const g1 = document.createElement("optgroup"); g1.label = "Trades";
+  settings.trades.forEach(t => g1.appendChild(opt(t, t)));
+  const g2 = document.createElement("optgroup"); g2.label = "Site managers";
+  settings.managers.forEach(t => g2.appendChild(opt(t, t)));
+  const g3 = document.createElement("optgroup"); g3.label = "Add";
+  g3.appendChild(opt("__trade", "+ Add a trade…"));
+  g3.appendChild(opt("__mgr", "+ Add a site manager…"));
+  sel.appendChild(g1); sel.appendChild(g2); sel.appendChild(g3);
+  if(task.assignee && !settings.trades.includes(task.assignee) && !settings.managers.includes(task.assignee)) g1.appendChild(opt(task.assignee, task.assignee));
+  sel.value = task.assignee || "";
+  sel.onclick = e => e.stopPropagation();
+  sel.onchange = () => {
+    let v = sel.value;
+    if(v === "__trade" || v === "__mgr"){
+      const name = (prompt(v === "__trade" ? "Trade or company name (e.g. ABC Electrical):" : "Site manager's name:") || "").trim();
+      if(!name){ sel.value = task.assignee || ""; return; }
+      const list = v === "__trade" ? settings.trades : settings.managers;
+      if(!list.includes(name)) list.push(name);
+      v = name;
+    }
+    task.assignee = v || undefined;
+    saveNow(); render();
+    if(v) showToast("Allocated to " + v);
+  };
+  wrap.appendChild(sel);
+  return wrap;
+}
+
+function tradeExportBar(holder){
+  const counts = {};
+  holder.tasks.forEach(t => { if(!t.done && t.assignee) counts[t.assignee] = (counts[t.assignee] || 0) + 1; });
+  const names = Object.keys(counts).sort();
+  const bar = document.createElement("div");
+  bar.className = "trade-bar";
+  if(!names.length){
+    bar.innerHTML = '<div class="dash-sub" style="margin:0 2px 8px">Tap the person on an item to allocate it to a trade or site manager — then send each trade their own list.</div>';
+    return bar;
+  }
+  const sel = document.createElement("select");
+  sel.className = "trade-sel";
+  names.forEach(n => { const o = document.createElement("option"); o.value = n; o.textContent = n + " (" + counts[n] + ")"; sel.appendChild(o); });
+  if(names.length > 1){ const o = document.createElement("option"); o.value = "__all"; o.textContent = "Every trade (a page each)"; sel.appendChild(o); }
+  const btn = document.createElement("button");
+  btn.className = "add-btn calloff-export";
+  btn.innerHTML = ICON.doc + " Trade PDF";
+  btn.onclick = () => exportTradePDF(sel.value === "__all" ? names : [sel.value], holder);
+  bar.appendChild(sel); bar.appendChild(btn);
+  return bar;
+}
+
+/* A notice per trade: their open General items, tick boxes, the completion deadline,
+   and the contra-charge warning in the footer of every page */
+function exportTradePDF(names, holder){
+  const lib = window.jspdf || {};
+  if(!lib.jsPDF){ showToast("PDF library not loaded — check connection"); return; }
+  const doc = new lib.jsPDF({ unit: "pt", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight();
+  const marginX = 46, footH = 118;
+  const hours = settings.noticeHours || 48;
+  const issued = new Date(), dueBy = new Date(issued.getTime() + hours * 3600000);
+  const fmtLong = d => d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const fmtTime = d => d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  const site = (plotInfo && plotInfo.site) || "Site";
+  const issuer = (typeof me !== "undefined" && me) ? (me.name || me.email) : "";
+  let y;
+
+  const footer = name => {
+    const fy = pageH - footH;
+    doc.setDrawColor(226, 230, 236); doc.setLineWidth(1); doc.line(marginX, fy, pageW - marginX, fy);
+    doc.setFillColor(253, 236, 238);
+    doc.roundedRect(marginX, fy + 10, pageW - marginX * 2, 52, 6, 6, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.setTextColor(176, 38, 56);
+    const notice = "IMPORTANT: The works listed above must be completed within " + hours + " hours of this notice (by " +
+      fmtTime(dueBy) + " on " + fmtLong(dueBy) + "). If they are not completed in that time, we reserve the right to " +
+      "appoint another contractor to carry out the works and to contra-charge all associated costs back to you.";
+    doc.splitTextToSize(notice, pageW - marginX * 2 - 20).forEach((ln, i) => doc.text(ln, marginX + 10, fy + 25 + i * 12));
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(94, 106, 117);
+    const sy = fy + 86;
+    doc.text("Issued by: " + (issuer || "______________________"), marginX, sy);
+    doc.text("Signed: ______________________", marginX + 200, sy);
+    doc.text("Received by (" + name + "): ______________________", marginX, sy + 18);
+    doc.text("Date: ____________", marginX + 330, sy + 18);
+  };
+  const header = (name, contd) => {
+    y = 54;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(19); doc.setTextColor(30, 39, 46);
+    doc.text("Outstanding Works Notice" + (contd ? " (cont.)" : ""), marginX, y);
+    y += 22;
+    doc.setFontSize(14); doc.setTextColor(9, 132, 227);
+    doc.text("For: " + name, marginX, y);
+    y += 18;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(94, 106, 117);
+    doc.text(site, marginX, y);
+    doc.text("Issued " + fmtTime(issued) + ", " + fmtLong(issued), pageW - marginX, y, { align: "right" });
+    y += 14;
+    doc.setFont("helvetica", "bold"); doc.setTextColor(176, 38, 56);
+    doc.text("Complete by " + fmtTime(dueBy) + ", " + fmtLong(dueBy), pageW - marginX, y, { align: "right" });
+    y += 10;
+    doc.setDrawColor(9, 132, 227); doc.setLineWidth(1.2); doc.line(marginX, y, pageW - marginX, y);
+    y += 22;
+  };
+
+  names.forEach((name, ni) => {
+    if(ni) doc.addPage();
+    const items = holder.tasks.filter(t => !t.done && t.assignee === name);
+    header(name, false); footer(name);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(60, 70, 80);
+    doc.text("Please action the following " + items.length + " item" + (items.length === 1 ? "" : "s") + ":", marginX, y);
+    y += 20;
+    items.forEach((t, i) => {
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11.5);
+      const lines = doc.splitTextToSize((i + 1) + ".  " + (t.name || "(item)"), pageW - marginX * 2 - 24);
+      const note = (t.note || "").trim();
+      doc.setFont("helvetica", "italic"); doc.setFontSize(10);
+      const nl = note ? doc.splitTextToSize(note, pageW - marginX * 2 - 24) : [];
+      const need = lines.length * 14 + nl.length * 12.5 + (t.due ? 13 : 0) + 12;
+      if(y + need > pageH - footH - 10){ doc.addPage(); header(name, true); footer(name); }
+      doc.setDrawColor(150, 160, 170); doc.setLineWidth(1); doc.rect(marginX, y - 9.5, 12, 12);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11.5); doc.setTextColor(30, 39, 46);
+      lines.forEach((ln, k) => doc.text(ln, marginX + 22, y + k * 14));
+      y += lines.length * 14;
+      if(t.due){ doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(180, 120, 26); doc.text("Promised by " + fmtDay(t.due), marginX + 22, y); y += 13; }
+      doc.setFont("helvetica", "italic"); doc.setFontSize(10); doc.setTextColor(60, 70, 80);
+      nl.forEach(ln => { doc.text(ln, marginX + 22, y); y += 12.5; });
+      y += 12;
+    });
+  });
+  const fd = new Date();
+  const file = (names.length === 1 ? names[0].replace(/[^A-Za-z0-9]+/g, "-") : "All-trades") + "-Works-Notice-" +
+    fd.getFullYear() + "-" + String(fd.getMonth() + 1).padStart(2, "0") + "-" + String(fd.getDate()).padStart(2, "0") + ".pdf";
+  doc.save(file);
+  showToast("Works notice exported" + (names.length === 1 ? " for " + names[0] : ""));
+}
+
 /* task whose tick should play the pop animation on the next render */
 let popTaskId = null;
 
@@ -2928,6 +3091,7 @@ function renderStage(stage){
     /* a plain task list held in one hidden plot: add tasks, tick them,
        swipe a row right to delete it */
     const holder = listHolder(stage);
+    body.appendChild(tradeExportBar(holder));
     holder.tasks.forEach(task => {
       const row = renderTask(stage, holder, task);
       attachTaskDeleteSwipe(row, holder, task);
@@ -3306,6 +3470,13 @@ function renderTask(stage, plot, task){
   nameInput.oninput = () => { task.name = nameInput.value; save(); };
   main.appendChild(nameInput);
 
+  if(stage.list && task.assignee){
+    const ac = document.createElement("span");
+    ac.className = "assign-chip" + (settings.managers.includes(task.assignee) ? " mgr" : "");
+    ac.textContent = task.assignee;
+    main.appendChild(ac);
+  }
+
   /* due-date chip (only shown once a date has been set) */
   const dueWrap = document.createElement("div");
   main.appendChild(dueWrap);
@@ -3381,7 +3552,8 @@ function renderTask(stage, plot, task){
     showToast(on ? "Added to your to-do list" : "Removed from your to-do list");
   };
 
-  if(!task.done || isTodo(task)) actions.appendChild(todoBtn);   /* nothing to chase once it's done */
+  if(stage.list) actions.appendChild(assignButton(task));
+  else if(!task.done || isTodo(task)) actions.appendChild(todoBtn);   /* nothing to chase once it's done */
   actions.appendChild(noteBtn);
   actions.appendChild(dueBtn);
   actions.appendChild(delBtn);
@@ -4760,7 +4932,7 @@ window.addEventListener("pagehide", saveNow);
    ============================================================ */
 function backupData(){
   return { kind: "site-progress-backup", version: 2, at: Date.now(),
-           state: state, timeline: timeline, completed: completed, programData: programData, calloffs: calloffs, plotInfo: plotInfo };
+           state: state, timeline: timeline, completed: completed, programData: programData, calloffs: calloffs, plotInfo: plotInfo, settings: settings };
 }
 function exportBackup(){
   saveNow();
@@ -4797,6 +4969,7 @@ function applyBackup(d){
   programData = d.programData || null;
   calloffs = d.calloffs || {};
   if(d.plotInfo) plotInfo = d.plotInfo;
+  if(d.settings) settings = Object.assign({}, DEFAULT_SETTINGS, d.settings);
   saveNow(); render();
   if(syncReady) syncForceUpload().then(() => showToast("Backup restored and shared with the team"));
   showToast("Backup restored");
@@ -4870,7 +5043,7 @@ checkForUpdate();
    ============================================================ */
 const SB_URL = "https://exgtwsorllyzhohefowu.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV4Z3R3c29ybGx5emhvaGVmb3d1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIyODY0NjcsImV4cCI6MjEwNzg2MjQ2N30.ocVjQxWe4a9OUOhHecBHZbBKzRkhRdp5PZp-0prynnM";
-const SYNC_KEYS = ["state", "timeline", "completed", "calloffs", "programData", "plotInfo"];
+const SYNC_KEYS = ["state", "timeline", "completed", "calloffs", "programData", "plotInfo", "settings"];
 const SYNC_META_KEY = "siteProgress.sync.v1";      /* { base: { key: { version, value } } } */
 
 var sb = null, me = null, syncReady = false, syncBusy = false, syncTimer = null, syncChannel = null;   /* var: saveNow may run before this line */
@@ -4899,6 +5072,7 @@ function getLocal(key){
   if(key === "calloffs") return calloffs;
   if(key === "programData") return programData || {};
   if(key === "plotInfo") return plotInfo || {};
+  if(key === "settings") return settings;
 }
 function setLocal(key, value){
   if(key === "state"){
@@ -4911,6 +5085,7 @@ function setLocal(key, value){
   else if(key === "completed") completed = Array.isArray(value) ? clone(value) : [];
   else if(key === "calloffs") calloffs = clone(value) || {};
   else if(key === "programData") programData = (value && Object.keys(value).length) ? clone(value) : null;
+  else if(key === "settings") settings = Object.assign({}, DEFAULT_SETTINGS, clone(value) || {});
   else if(key === "plotInfo"){ plotInfo = (value && value.headers) ? clone(value) : null; piLegendCache = null; }
 }
 /* Merge one document. For the site state, a plot moved on one device while being edited on another
