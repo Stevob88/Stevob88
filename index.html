@@ -815,7 +815,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 67 · 19 Oct";
+const BUILD = "build 68 · 19 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -4303,6 +4303,14 @@ function exportCommentsPDF(){
       doc.setTextColor(r.t.done ? 0 : 180, r.t.done ? 161 : 120, r.t.done ? 157 : 26);
       doc.text(r.t.done ? "done" : "open", pageW - marginX, y, { align: "right" });
       y += (headLines.length - 1) * 13 + 14;
+      if(r.t.assignee){                                 /* General items: who it's allocated to */
+        doc.setFont("helvetica", "bold"); doc.setFontSize(9.5);
+        const mgr = settings.managers.includes(r.t.assignee);
+        if(mgr) doc.setTextColor(60, 70, 80); else doc.setTextColor(9, 132, 227);
+        newPageIfNeeded(13);
+        doc.text("Allocated to: " + r.t.assignee + (mgr ? " (site manager)" : ""), marginX + 20, y);
+        y += 13;
+      }
       doc.setFont("helvetica", "italic");
       doc.setFontSize(10);
       doc.setTextColor(60, 70, 80);
@@ -4311,7 +4319,7 @@ function exportCommentsPDF(){
         doc.text(line, marginX + 20, y);
         y += 12.5;
       });
-      y += noteLines.length ? 8 : 4;
+      y += noteLines.length ? 8 : (r.t.assignee ? 7 : 4);
     });
     y += 8;
   });
