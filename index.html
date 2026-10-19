@@ -569,6 +569,32 @@
   .dash-group{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-soft);margin:12px 0 2px;}
   .dash-group:first-of-type{margin-top:0;}
 
+  /* ---------- Programme on each plot ---------- */
+  .prog-chip{display:inline-block;white-space:nowrap;margin-top:4px;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:99px;background:#EEF1F5;color:#5E6A75;}
+  .prog-chip.late{background:#FDE6E9;color:#D23C4E;}
+  .prog-chip.today{background:#FDF1DC;color:#B4781A;}
+  .prog-chip.now{background:var(--blue-soft);color:var(--blue);}
+  .auto-tag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:#D23C4E;margin-left:6px;vertical-align:1px;}
+  .pstrip{margin:2px 0 10px;padding:10px 10px 8px;background:var(--bg);border-radius:14px;}
+  .pstrip-head{display:flex;align-items:baseline;gap:8px;font-size:12px;margin-bottom:6px;}
+  .pstrip-head b{font-weight:800;}
+  .pstrip-head span{margin-left:auto;font-size:10.5px;font-weight:600;color:var(--ink-soft);}
+  .pstrip-grid{position:relative;background:#fff;border-radius:8px;overflow:hidden;}
+  .pstrip-off{position:absolute;top:0;bottom:0;background:#EEF1F5;}
+  .pstrip-bar{position:absolute;height:15px;border-radius:4px;font-size:9.5px;font-weight:800;color:#fff;line-height:15px;padding:0 3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-shadow:0 0 2px rgba(0,0,0,.35);}
+  .pstrip-bar.done{opacity:.35;}
+  .pstrip-bar.late{box-shadow:0 0 0 2px #D23C4E;}
+  .pstrip-now{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:#1E272E;}
+  .pstrip-ax{position:relative;height:13px;margin-top:3px;font-size:9.5px;font-weight:700;color:var(--ink-soft);}
+  .pstrip-ax span{position:absolute;white-space:nowrap;padding-left:2px;}
+  .pstrip-none{font-size:11.5px;color:var(--ink-soft);margin-top:6px;}
+  .pstrip-list{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px;}
+  .pstrip-it{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;}
+  .pstrip-it i{width:8px;height:8px;border-radius:3px;flex-shrink:0;}
+  .pstrip-it em{font-style:normal;font-weight:500;color:var(--ink-soft);}
+  .pstrip-it.done{opacity:.45;text-decoration:line-through;}
+  .pstrip-it.late em{color:#D23C4E;font-weight:700;}
+
   /* ---------- Today on site (programme from BuildFlow) ---------- */
   #today-btn{
     margin-left:auto;flex-shrink:0;width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;
@@ -874,7 +900,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 70 · 19 Oct";
+const BUILD = "build 71 · 19 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -1346,7 +1372,8 @@ function normalize(stages){
         note: t.note || "",
         noteOpen: !!t.noteOpen,
         todo: (t.todo && typeof t.todo === "object" && Object.keys(t.todo).length) ? t.todo : undefined,
-        assignee: t.assignee || undefined
+        assignee: t.assignee || undefined,
+        progDismiss: (t.progDismiss && typeof t.progDismiss === "object" && Object.keys(t.progDismiss).length) ? t.progDismiss : undefined
       }))
     }))
   }));
@@ -2670,7 +2697,9 @@ function myTodos(){
   state.forEach(stage => stage.plots.forEach(plot => plot.tasks.forEach(task => {
     if(!task.done && isTodo(task)) out.push({ stage, plot, task, at: task.todo[myId()] });
   })));
-  return out.sort((a, b) => (a.task.due || "9999") < (b.task.due || "9999") ? -1 : (a.task.due || "9999") > (b.task.due || "9999") ? 1 : a.at - b.at);
+  out.sort((a, b) => (a.task.due || "9999") < (b.task.due || "9999") ? -1 : (a.task.due || "9999") > (b.task.due || "9999") ? 1 : a.at - b.at);
+  /* then jobs late on the programme, most overdue first */
+  return out.concat(progTodos().sort((a, b) => a.auto.e < b.auto.e ? -1 : a.auto.e > b.auto.e ? 1 : progPlotOrder(plotNoOf(a.plot.name), plotNoOf(b.plot.name))));
 }
 let todoOpen = false;
 function renderTodoSection(){
@@ -2687,8 +2716,8 @@ function renderTodoSection(){
   exp.innerHTML = ICON.doc + " Export to-do & comments PDF";
   exp.onclick = exportCommentsPDF;
   body.appendChild(exp);
-  if(!rows.length) body.appendChild(emptyNote("Nothing on your list. Tap the flag on any task to add it here — then tick it off when it's done, or export the list with your comments to print."));
-  rows.forEach(({ stage, plot, task }) => {
+  if(!rows.length) body.appendChild(emptyNote("Nothing on your list. Tap the flag on any task to add it here — then tick it off when it's done, or export the list with your comments to print. Jobs late on the programme are added automatically."));
+  rows.forEach(({ stage, plot, task, auto }) => {
     const row = document.createElement("div");
     row.className = "task todo-row";
     const tick = document.createElement("div");
@@ -2703,15 +2732,19 @@ function renderTodoSection(){
     };
     const main = document.createElement("div");
     main.className = "task-main";
-    main.innerHTML = '<div class="task-name todo-name">' + dashEsc(task.name || "(unnamed task)") + '</div>' +
+    main.innerHTML = '<div class="task-name todo-name">' + dashEsc(task.name || "(unnamed task)") + (auto ? '<span class="auto-tag">late on programme</span>' : '') + '</div>' +
       '<div class="due-where">' + dashEsc((stage.list ? "" : plotLabel(plot.name) + " · ") + stage.name) + '</div>' +
       ((task.note || "").trim() ? '<div class="todo-note">' + dashEsc(task.note.trim()) + '</div>' : '');
     if(task.due) main.appendChild(dueChip(task));
+    if(auto){ const pc = progChip(task, auto); if(pc) main.appendChild(pc); }
     const rm = document.createElement("button");
     rm.className = "icon-btn";
     rm.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
     rm.setAttribute("aria-label", "Remove from my to-do list");
-    rm.onclick = () => { setTodo(task, false); saveNow(); render(); };
+    rm.onclick = () => {
+      if(auto){ progDismiss(task, auto); showToast("Removed — it comes back if the programme date changes"); } else setTodo(task, false);
+      saveNow(); render();
+    };
     row.appendChild(tick); row.appendChild(main); row.appendChild(rm);
     body.appendChild(row);
   });
@@ -3307,6 +3340,8 @@ function renderPlot(stage, plot){
   /* Foundations plot that hasn't reached its programme "1" yet: only a countdown, nothing else */
   const notYet = stage.progNo === 1 && !stage.basic && !plotStarted(plot, stage);
   const chips = notYet ? s1Countdown(plot) : progChips(plot, stage);   /* ahead + claim chips on their own line */
+  const pLate = plotProgLate(plot);
+  if(pLate){ const c = document.createElement("span"); c.className = "due-chip over"; c.textContent = pLate + " late on programme"; chips.push(c); }
   if(chips.length){
     const cw = document.createElement("div");
     cw.className = "plot-chips";
@@ -3339,6 +3374,8 @@ function renderPlot(stage, plot){
 
   const body = document.createElement("div");
   body.className = "plot-body";
+  const strip = plotProgStrip(plot);
+  if(strip) body.appendChild(strip);
   plot.tasks.forEach((task, i) => {
     body.appendChild(renderTask(stage, plot, task));
     /* time bar between two consecutive completed phases */
@@ -3588,6 +3625,8 @@ function renderTask(stage, plot, task){
     dueBtn.className = "icon-btn due-btn" + (st === "over" ? " due-over" : st === "today" ? " due-today" : st ? " due-set" : "");
     dueWrap.innerHTML = "";
     if(task.due) dueWrap.appendChild(dueChip(task));
+    const pc = stage.list ? null : progChip(task, progFor(plot.name, task.name));
+    if(pc) dueWrap.appendChild(pc);
   }
   paintDue();
 
@@ -4295,7 +4334,7 @@ function exportCommentsPDF(){
     doc.setFont("helvetica", "normal"); doc.setFontSize(11); doc.setTextColor(94, 106, 117);
     doc.text("Nothing on your to-do list.", marginX, y); y += 22;
   }
-  todos.forEach(({ stage, plot, task }) => {
+  todos.forEach(({ stage, plot, task, auto }) => {
     const noteTxt = (task.note || "").trim();
     const noteLines = noteTxt ? doc.splitTextToSize(noteTxt, pageW - marginX * 2 - 24) : [];
     newPageIfNeeded(32 + noteLines.length * 12.5);
@@ -4308,6 +4347,9 @@ function exportCommentsPDF(){
       doc.setFont("helvetica", "bold"); doc.setFontSize(9);
       if(st === "over") doc.setTextColor(210, 60, 78); else if(st === "today") doc.setTextColor(180, 120, 26); else doc.setTextColor(9, 132, 227);
       doc.text("due " + fmtDay(task.due), pageW - marginX, y, { align: "right" });
+    } else if(auto){
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(210, 60, 78);
+      doc.text("late on programme · due " + fmtDay(auto.e), pageW - marginX, y, { align: "right" });
     }
     y += 13;
     doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(94, 106, 117);
@@ -4739,6 +4781,7 @@ async function progFetch(){
   bfProg = { version: data.version, value: data.value };
   try{ localStorage.setItem(BFP_KEY, JSON.stringify(bfProg)); }catch(e){ console.warn(e); }
   if(!document.getElementById("today-overlay").hidden) renderToday();
+  if(!userTyping()) render();
 }
 async function progSyncNow(btn){
   if(!syncReady || !sb){ showToast("Sign in to sync the programme"); return; }
@@ -4993,6 +5036,134 @@ function renderToday(){
   document.getElementById("td-sync").onclick = e => progSyncNow(e.currentTarget);
   body.querySelectorAll(".td-seg button").forEach(b => b.onclick = () => { todayView = b.dataset.v; renderToday(); });
   body.querySelectorAll("[data-plot]").forEach(el => el.onclick = e => { e.stopPropagation(); jumpToPlot(el.dataset.plot); });
+}
+
+/* ============================================================
+   Programme on each plot: strip of bars, due dates on tasks,
+   late jobs onto the to-do list (worked out live, nothing stored)
+   ============================================================ */
+let progIdxCache = null;
+function progIndex(){
+  const prog = bfP();
+  if(!prog) return null;
+  if(progIdxCache && progIdxCache.src === prog) return progIdxCache;
+  const byPlot = {}, byKey = {};
+  prog.acts.forEach(a => {
+    (byPlot[a.p] = byPlot[a.p] || []).push(a);
+    let k = progNorm(a.l || a.t); k = PROG_ALIAS[k] || k;
+    const key = a.p + "|" + k;
+    const cur = byKey[key];
+    if(!cur) byKey[key] = { s: a.s, e: a.e, acts: [a] };
+    else { cur.acts.push(a); if(a.s < cur.s) cur.s = a.s; if(a.e > cur.e) cur.e = a.e; }
+  });
+  progIdxCache = { src: prog, prog, byPlot, byKey };
+  return progIdxCache;
+}
+function plotNoOf(name){ const m = String(name || "").match(/^\s*plot\s+(\S+)/i); return m ? m[1] : null; }
+/* the programme dates for one checklist task: { s, e, acts } (e = the last bar's finish) */
+function progFor(plotName, taskName){
+  const ix = progIndex(), no = plotNoOf(plotName);
+  if(!ix || !no || !taskName) return null;
+  let k = progNorm(taskName); k = PROG_ALIAS[k] || k;
+  return ix.byKey[no + "|" + k] || null;
+}
+/* "late" | "today" | "now" | "next" | null — for a task that isn't ticked */
+function progTaskState(pf){
+  if(!pf) return null;
+  const t = todayStr();
+  if(pf.e < t) return "late";
+  if(pf.e === t) return "today";
+  if(pf.s <= t) return "now";
+  return "next";
+}
+function progLateDays(pf){ return Math.max(1, progWorkDays(pf.e, todayStr(), progIndex().prog) - 1); }
+function progChip(task, pf){
+  const st = progTaskState(pf);
+  if(!st || task.done) return null;
+  const c = document.createElement("span");
+  c.className = "prog-chip " + st;
+  const n = st === "late" ? progLateDays(pf) : 0;
+  const sd = x => progDayLabel(x, { day: "numeric", month: "short" });
+  c.textContent = st === "late" ? n + (n === 1 ? " day" : " days") + " late · prog " + sd(pf.e)
+                : st === "today" ? "Programme due today"
+                : st === "now" ? "On now · prog due " + sd(pf.e)
+                : "Prog " + sd(pf.s) + (pf.s !== pf.e ? " – " + sd(pf.e) : "");
+  return c;
+}
+/* number of unticked tasks on a plot that are past their programme finish */
+function plotProgLate(plot){
+  let n = 0;
+  plot.tasks.forEach(t => { if(!t.done && progTaskState(progFor(plot.name, t.name)) === "late") n++; });
+  return n;
+}
+/* late programme jobs go onto everyone's to-do list automatically, until ticked or removed */
+function progTodos(){
+  const out = [], id = myId();
+  if(!progIndex()) return out;
+  state.forEach(stage => stage.plots.forEach(plot => plot.tasks.forEach(task => {
+    if(task.done || isTodo(task)) return;
+    const pf = progFor(plot.name, task.name);
+    if(progTaskState(pf) !== "late") return;
+    if(task.progDismiss && task.progDismiss[id] === pf.e) return;     /* removed for this programme date */
+    out.push({ stage, plot, task, at: 0, auto: pf });
+  })));
+  return out;
+}
+function progDismiss(task, pf){
+  task.progDismiss = Object.assign({}, task.progDismiss || {});
+  task.progDismiss[myId()] = pf.e;
+}
+
+/* strip: this plot's bars from Monday last week to the end of the week after next */
+function plotProgStrip(plot){
+  const ix = progIndex(), no = plotNoOf(plot.name);
+  if(!ix || !no || !ix.byPlot[no]) return null;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const start = new Date(now); start.setDate(start.getDate() - ((start.getDay() + 6) % 7) - 7);
+  const DAYS = 21;
+  const end = new Date(start); end.setDate(end.getDate() + DAYS - 1);
+  const s0 = isoLocal(start), s1 = isoLocal(end);
+  const acts = ix.byPlot[no].filter(a => a.e >= s0 && a.s <= s1).sort((a, b) => a.s < b.s ? -1 : a.s > b.s ? 1 : 0);
+  const wrap = document.createElement("div");
+  wrap.className = "pstrip";
+  const dayIdx = iso => Math.round((isoToDate(iso) - start) / 86400000);
+  /* lanes: first free lane, so overlapping bars stack */
+  const lanes = [];
+  const placed = acts.map(a => {
+    const x0 = Math.max(0, dayIdx(a.s)), x1 = Math.min(DAYS - 1, dayIdx(a.e));
+    let lane = lanes.findIndex(endAt => endAt < x0);
+    if(lane < 0){ lane = lanes.length; lanes.push(-1); }
+    lanes[lane] = x1;
+    return { a, x0, x1, lane };
+  });
+  const nl = Math.max(1, lanes.length);
+  let h = '<div class="pstrip-head"><b>Programme</b><span>' + dashEsc(progSyncedText(ix.prog).replace("From BuildFlow · ", "BuildFlow · ")) + '</span></div>';
+  h += '<div class="pstrip-grid" style="height:' + (nl * 18 + 5) + 'px">';
+  for(let i = 0; i < DAYS; i++){
+    const d = new Date(start); d.setDate(d.getDate() + i);
+    if(!progWorking(d, ix.prog)) h += '<span class="pstrip-off" style="left:' + (i / DAYS * 100) + '%;width:' + (100 / DAYS) + '%"></span>';
+  }
+  const items = [];
+  placed.forEach(p => {
+    const m = progFor(plot.name, p.a.l || p.a.t);
+    const task = plot.tasks.find(t => progFor(plot.name, t.name) === m && m);
+    const cls = task && task.done ? " done" : (p.a.e < todayStr() && task) ? " late" : "";
+    const sd = x => progDayLabel(x, { day: "numeric", month: "short" });
+    items.push('<span class="pstrip-it' + cls + '"><i style="background:' + dashEsc(progTradeColour(ix.prog, p.a)) + '"></i>' + dashEsc(p.a.l || p.a.t) +
+      ' <em>' + dashEsc(p.a.s === p.a.e ? sd(p.a.s) : sd(p.a.s) + "–" + sd(p.a.e)) + '</em></span>');
+    h += '<span class="pstrip-bar' + cls + '" title="' + dashEsc((p.a.l || p.a.t) + ": " + fmtDay(p.a.s) + " – " + fmtDay(p.a.e)) + '" style="left:' + (p.x0 / DAYS * 100) + '%;width:calc(' + ((p.x1 - p.x0 + 1) / DAYS * 100) + '% - 2px);top:' + (3 + p.lane * 18) + 'px;background:' + dashEsc(progTradeColour(ix.prog, p.a)) + '">' + dashEsc(p.a.l || p.a.t) + '</span>';
+  });
+  h += '<span class="pstrip-now" style="left:' + ((dayIdx(isoLocal(now)) + .5) / DAYS * 100) + '%"></span></div>';
+  h += '<div class="pstrip-ax">';
+  for(let w = 0; w < 3; w++){
+    const d = new Date(start); d.setDate(d.getDate() + w * 7);
+    h += '<span style="left:' + (w * 7 / DAYS * 100) + '%">' + (w === 1 ? "This week" : d.toLocaleDateString(undefined, { day: "numeric", month: "short" })) + '</span>';
+  }
+  h += '</div>';
+  if(!acts.length) h += '<div class="pstrip-none">Nothing on the programme for this plot in these three weeks.</div>';
+  else h += '<div class="pstrip-list">' + items.join("") + '</div>';
+  wrap.innerHTML = h;
+  return wrap;
 }
 
 function openPlan(){
