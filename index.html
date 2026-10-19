@@ -568,6 +568,52 @@
   .dash-empty{font-size:13.5px;color:var(--ink-soft);padding:6px 0;line-height:1.5;}
   .dash-group{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-soft);margin:12px 0 2px;}
   .dash-group:first-of-type{margin-top:0;}
+
+  /* ---------- Today on site (programme from BuildFlow) ---------- */
+  #today-btn{
+    margin-left:auto;flex-shrink:0;width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;
+    border:none;border-radius:50%;background:#fff;box-shadow:var(--shadow);color:var(--blue);cursor:pointer;padding:0;
+    transition:transform .15s ease;
+  }
+  #today-btn:active{transform:scale(.93);}
+  #today-btn svg{width:18px;height:18px;}
+  #today-btn ~ #dash-btn{margin-left:0;}
+  .td-sync{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600;color:var(--ink-soft);margin:0 2px 12px;}
+  .td-sync span{flex:1;line-height:1.3;}
+  .td-syncbtn{border:none;border-radius:99px;background:var(--blue-soft);color:var(--blue);font:inherit;font-weight:800;font-size:12.5px;padding:8px 14px;cursor:pointer;}
+  .td-syncbtn:disabled{opacity:.6;}
+  .td-note{font-size:12.5px;font-weight:600;color:#B4781A;background:#FDF1DC;border-radius:12px;padding:9px 12px;margin-bottom:12px;}
+  .td-seg{display:inline-flex;background:var(--bg);border-radius:99px;padding:3px;margin:-2px 0 6px;}
+  .td-seg button{border:none;background:transparent;font:inherit;font-size:12.5px;font-weight:700;color:var(--ink-soft);padding:6px 14px;border-radius:99px;cursor:pointer;}
+  .td-seg button.on{background:#fff;color:var(--blue);box-shadow:0 2px 8px rgba(9,100,180,.12);}
+  .td-row{padding:10px 0;border-top:1px solid var(--line);cursor:pointer;}
+  .td-row:first-of-type, .td-seg + .td-row{border-top:none;}
+  .td-rh{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .td-rh b{font-size:14.5px;font-weight:800;}
+  .td-rh .pw-stage{margin:0;}
+  .td-flag{margin-left:auto;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#D23C4E;background:#FDE6E9;padding:3px 8px;border-radius:99px;}
+  .td-cnt{margin-left:auto;font-size:12px;font-weight:700;color:var(--ink-soft);}
+  .td-dot{width:11px;height:11px;border-radius:4px;flex-shrink:0;}
+  .td-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;}
+  .td-act{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;padding:5px 10px;border-radius:11px;background:var(--bg);line-height:1.25;}
+  .td-act i, .td-li i{width:9px;height:9px;border-radius:3px;flex-shrink:0;}
+  .td-act em{font-style:normal;font-weight:600;color:var(--ink-soft);}
+  .td-act small, .td-plot small{font-size:11px;font-weight:600;color:var(--ink-soft);}
+  .td-act.done, .td-plot.done{background:#DDF7F6;}
+  .td-act.done small, .td-plot.done small{color:#00A19D;font-weight:800;}
+  .td-plot{display:inline-flex;align-items:baseline;gap:5px;font-size:12.5px;font-weight:700;padding:5px 10px;border-radius:11px;background:var(--bg);}
+  .td-late{margin-top:6px;}
+  .td-li{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;padding:4px 0;}
+  .td-li span{flex:1;line-height:1.2;}
+  .td-li span small{display:block;font-size:11px;font-weight:500;color:var(--ink-soft);}
+  .td-li em{font-style:normal;font-size:11.5px;font-weight:700;color:#D23C4E;background:#FDE6E9;padding:3px 9px;border-radius:99px;white-space:nowrap;}
+  .td-tog{cursor:pointer;}
+  .td-tog .td-cnt{font-size:12.5px;letter-spacing:0;}
+  .td-behind .dash-sub, .td-behind .td-bbody{display:none;}
+  .td-behind.open .dash-sub{display:block;}
+  .td-behind.open .td-bbody{display:block;}
+  .td-bl{font-size:12.5px;font-weight:600;line-height:1.5;margin-top:4px;}
+  .td-bl em{font-style:normal;color:var(--ink-soft);font-weight:500;}
   .plot-weeks{flex-basis:100%;display:flex;align-items:center;gap:10px;padding-left:26px;}
   .plot-weeks .dash-track{flex:1;height:10px;}
   .plot-weeks .dk{animation:none;}
@@ -685,6 +731,9 @@
       <span class="sync-dot off" id="sync-dot"></span>
     </div>
     <h1>Site <span>Progress</span></h1>
+    <button id="today-btn" aria-label="Today on site">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/></svg>
+    </button>
     <button id="dash-btn" aria-label="Dashboard">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
     </button>
@@ -797,6 +846,16 @@
   </div>
   <div class="dash-scroll" id="dash-body"></div>
 </div>
+<!-- Today on site -->
+<div class="plan-overlay dash-overlay" id="today-overlay" hidden>
+  <div class="plan-bar">
+    <button id="today-close" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <span class="plan-title">Today <span style="color:var(--blue)">on site</span></span>
+  </div>
+  <div class="dash-scroll" id="today-body"></div>
+</div>
 <input type="file" id="pinfo-file" accept="application/pdf,.pdf" hidden />
 <div class="plan-overlay dash-overlay" id="pinfo-overlay" hidden>
   <div class="plan-bar">
@@ -815,7 +874,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 69 · 19 Oct";
+const BUILD = "build 70 · 19 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -4373,6 +4432,8 @@ function planBind(){
   document.getElementById("plan-btn").onclick = openPlan;
   document.getElementById("dash-btn").onclick = openDashboard;
   document.getElementById("dash-close").onclick = closeDashboard;
+  document.getElementById("today-btn").onclick = openToday;
+  document.getElementById("today-close").onclick = closeToday;
   document.getElementById("pinfo-file").onchange = onPlotInfoFile;
   document.getElementById("pinfo-close").onclick = closePlotInfo;
   planEls.attach.onclick = () => planEls.file.click();
@@ -4659,6 +4720,279 @@ function openDashboard(){
 function closeDashboard(){
   document.getElementById("dash-overlay").hidden = true;
   document.body.style.overflow = "";
+}
+
+/* ============================================================
+   Programme from BuildFlow — synced on the server every morning
+   (programme-sync function) into the shared "programme" doc.
+   Read only here: this device never writes it.
+   ============================================================ */
+const BFP_KEY = "siteProgress.bfProgramme";
+let bfProg = loadJSON(BFP_KEY, null);             /* { version, value } */
+const bfP = () => (bfProg && bfProg.value && Array.isArray(bfProg.value.acts)) ? bfProg.value : null;
+
+async function progFetch(){
+  if(!syncReady || !sb) return;
+  const { data, error } = await sb.from("docs").select("version,value").eq("key", "programme").maybeSingle();
+  if(error || !data) return;
+  if(bfProg && bfProg.version === data.version) return;
+  bfProg = { version: data.version, value: data.value };
+  try{ localStorage.setItem(BFP_KEY, JSON.stringify(bfProg)); }catch(e){ console.warn(e); }
+  if(!document.getElementById("today-overlay").hidden) renderToday();
+}
+async function progSyncNow(btn){
+  if(!syncReady || !sb){ showToast("Sign in to sync the programme"); return; }
+  if(navigator.onLine === false){ showToast("You're offline — try again when you have signal"); return; }
+  btn.disabled = true; btn.textContent = "Syncing…";
+  try{
+    const { data, error } = await sb.functions.invoke("programme-sync", { body: {} });
+    if(error) throw error;
+    if(!data || !data.ok) throw new Error((data && data.error) || "Sync failed");
+    await progFetch();
+    showToast("Programme synced — " + data.activities + " activities on " + data.plots + " plots");
+  }catch(e){
+    console.warn("programme sync", e);
+    let msg = e.message || "unknown problem";
+    try{ const j = e.context && await e.context.json(); if(j && j.error) msg = j.error; }catch(_){}
+    showToast("Couldn't sync the programme: " + msg);
+  }finally{
+    btn.disabled = false; btn.textContent = "Sync now";
+    renderToday();
+  }
+}
+
+/* ---- dates (programme dates are plain YYYY-MM-DD, worked in local time) ---- */
+const isoLocal = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+const isoToDate = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+function progWorking(d, prog){
+  return (prog.workDays || [1, 2, 3, 4, 5]).includes(d.getDay()) && !(prog.holidays || []).includes(isoLocal(d));
+}
+/* working days from a to b inclusive (a <= b) */
+function progWorkDays(a, b, prog){
+  let n = 0;
+  for(let d = isoToDate(a), end = isoToDate(b); d <= end; d.setDate(d.getDate() + 1)) if(progWorking(d, prog)) n++;
+  return n;
+}
+function progDayLabel(s, opts){ return isoToDate(s).toLocaleDateString(undefined, opts || { weekday: "short", day: "numeric", month: "short" }); }
+
+/* ---- link a programme bar to the checklist: is that job ticked in Site Progress? ---- */
+const progNorm = t => String(t || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const PROG_ALIAS = { scaffoldstrike: "scaffolddismantle", airtest: "airtest" };
+function progTaskStages(){
+  /* which flow stage each task name belongs to (from every plot's checklist) */
+  const m = {};
+  state.forEach(s => { if(!s.basic && s.progNo) s.plots.forEach(p => p.tasks.forEach(t => { const k = progNorm(t.name); if(!(k in m)) m[k] = s.progNo; })); });
+  return m;
+}
+/* returns { state: "done" | "open" | "unknown", task, stage, plot } */
+function progMatch(plotNo, label, ctx){
+  const name = "Plot " + plotNo;
+  let key = progNorm(label);
+  key = PROG_ALIAS[key] || key;
+  let flow = null;
+  for(const s of state){
+    const p = s.plots.find(x => x.name === name);
+    if(!p) continue;
+    if(!s.basic && s.progNo) flow = { s, p };
+    const t = p.tasks.find(x => (PROG_ALIAS[progNorm(x.name)] || progNorm(x.name)) === key);
+    if(t) return { state: t.done ? "done" : "open", task: t, stage: s, plot: p };
+  }
+  if(completed.some(c => c.name === name)) return { state: "done" };
+  const ts = ctx.taskStage[key];
+  if(flow && ts){
+    if(ts < flow.s.progNo) return { state: "done", stage: flow.s, plot: flow.p };          /* plot has moved past that stage */
+    return { state: "open", stage: flow.s, plot: flow.p, notReached: true };
+  }
+  return { state: "unknown", stage: flow && flow.s, plot: flow && flow.p };
+}
+
+function progPlotOrder(a, b){
+  const na = parseInt(a, 10), nb = parseInt(b, 10);
+  return (isNaN(na) || isNaN(nb)) ? String(a).localeCompare(String(b)) : na - nb || String(a).localeCompare(String(b));
+}
+function progTradeColour(prog, a){
+  if(a.c) return a.c;
+  const t = (prog.trades || []).find(x => x.n === a.t);
+  return t ? t.c : "#94A3B8";
+}
+function progSyncedText(prog){
+  if(!prog || !prog.syncedAt) return "";
+  const d = new Date(prog.syncedAt), today = new Date();
+  const when = isoLocal(d) === isoLocal(today) ? "today " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+             : d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }) + " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return "From BuildFlow · synced " + when;
+}
+
+/* ============================================================
+   Today on site — who should be where, and what's late
+   ============================================================ */
+let todayView = "plot", todayBehindOpen = false;
+function openToday(){
+  renderToday();
+  document.getElementById("today-overlay").hidden = false;
+  document.getElementById("today-body").scrollTop = 0;
+  document.body.style.overflow = "hidden";
+  progFetch();
+}
+function closeToday(){
+  document.getElementById("today-overlay").hidden = true;
+  document.body.style.overflow = "";
+}
+function jumpToPlot(name){
+  const s = state.find(st => !st.basic && st.progNo && st.plots.some(p => p.name === name)) || state.find(st => st.plots.some(p => p.name === name));
+  if(!s){ showToast(name + " isn't in Site Progress"); return; }
+  const p = s.plots.find(x => x.name === name);
+  closeToday();
+  s.open = true; p.open = true; save(); render();
+  requestAnimationFrame(() => {
+    const inputs = app.querySelectorAll(".plot-name");
+    for(let i = 0; i < inputs.length; i++){
+      if(inputs[i].value === name){ const card = inputs[i].closest(".plot"); if(card) card.scrollIntoView({ block: "center", behavior: "smooth" }); break; }
+    }
+  });
+}
+
+function todayData(prog){
+  const now = new Date();
+  let day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let isToday = true;
+  for(let i = 0; i < 14 && !progWorking(day, prog); i++){ day.setDate(day.getDate() + 1); isToday = false; }
+  const dayIso = isoLocal(day);
+  const ctx = { taskStage: progTaskStages() };
+  const on = [], late = [], behind = [];
+  prog.acts.forEach(a => {
+    if(a.st === "complete") return;
+    if(a.s <= dayIso && a.e >= dayIso){
+      const m = progMatch(a.p, a.l, ctx);
+      on.push({ a, m, n: progWorkDays(a.s, dayIso, prog), of: Math.max(1, a.d || 1) });
+    } else if(a.e < dayIso){
+      const m = progMatch(a.p, a.l, ctx);
+      if(m.state === "open") (m.notReached ? behind : late).push({ a, m, by: progWorkDays(a.e, dayIso, prog) - 1 });
+    }
+  });
+  /* one entry per plot + job: skip if the same job has another bar still running or to come, keep the latest */
+  const live = new Set(prog.acts.filter(a => a.e >= dayIso).map(a => a.p + "|" + progNorm(a.l || a.t)));
+  const dedupe = list => {
+    const best = {};
+    list.forEach(x => { const k = x.a.p + "|" + progNorm(x.a.l || x.a.t); if(live.has(k)) return; if(!best[k] || x.a.e > best[k].a.e) best[k] = x; });
+    return Object.values(best);
+  };
+  return { day, dayIso, isToday, on, late: dedupe(late), behind: dedupe(behind) };
+}
+
+function todayChip(prog, x, extra){
+  const a = x.a, done = x.m && x.m.state === "done";
+  let when = extra;
+  if(!when){
+    if(a.k === "milestone") when = "milestone";
+    else if(x.of <= 1) when = "today only";
+    else if(x.n === 1) when = "day 1 of " + x.of;
+    else if(x.n >= x.of) when = "last day";
+    else when = "day " + x.n + " of " + x.of;
+  }
+  return '<span class="td-act' + (done ? ' done' : '') + '"><i style="background:' + dashEsc(progTradeColour(prog, a)) + '"></i>' +
+    (a.l && a.t && progNorm(a.l) !== progNorm(a.t) ? dashEsc(a.l) + ' <em>' + dashEsc(a.t) + '</em>' : dashEsc(a.l || a.t || "Activity")) +
+    '<small>' + (done ? '✓ ticked' : dashEsc(when)) + '</small></span>';
+}
+function todayPlotHead(no, prog){
+  const name = "Plot " + no;
+  const st = state.find(s => !s.basic && s.progNo && s.plots.some(p => p.name === name));
+  const bfPlot = (prog.plots || []).find(p => p.no === String(no));
+  const ht = houseType(name) || (bfPlot && bfPlot.ht) || "";
+  return (st ? '<span class="pw-stage">S' + st.progNo + '</span>' : '') + '<b>' + dashEsc(name) + '</b>' + (ht ? '<span class="ht-chip">' + dashEsc(ht) + '</span>' : '');
+}
+
+function renderToday(){
+  const body = document.getElementById("today-body");
+  const prog = bfP();
+  let h = "";
+  const syncBar = '<div class="td-sync"><span>' + dashEsc(prog ? progSyncedText(prog) : "Programme from BuildFlow") + '</span>' +
+                  '<button class="td-syncbtn" id="td-sync">Sync now</button></div>';
+  if(!prog){
+    h += syncBar + '<div class="dash-card"><div class="dash-empty">' +
+      (syncReady ? "The programme hasn't come through yet — tap Sync now." : "Sign in to get the programme from BuildFlow.") + '</div></div>';
+    body.innerHTML = h;
+    document.getElementById("td-sync").onclick = e => progSyncNow(e.currentTarget);
+    return;
+  }
+  const d = todayData(prog);
+  const plotsOn = new Set(d.on.map(x => x.a.p));
+  const latePlots = new Set(d.late.map(x => x.a.p));
+  h += syncBar;
+  if(!d.isToday) h += '<div class="td-note">No work programmed today — showing ' + dashEsc(progDayLabel(d.dayIso, { weekday: "long", day: "numeric", month: "short" })) + '.</div>';
+  h += '<div class="dash-kpis td-kpis">' +
+    '<div class="dash-kpi"><b>' + plotsOn.size + '</b><span>Plots being worked</span></div>' +
+    '<div class="dash-kpi"><b>' + d.on.length + '</b><span>Trade activities</span></div>' +
+    '<div class="dash-kpi' + (d.late.length ? ' warn' : '') + '"><b>' + d.late.length + '</b><span>Late — not ticked</span></div>' +
+    '<div class="dash-kpi"><b>' + new Set(d.on.map(x => x.a.t)).size + '</b><span>Trades on site</span></div></div>';
+
+  /* who should be where */
+  h += '<div class="dash-card"><h3>Who should be where <em>' + (d.isToday ? 'today' : dashEsc(progDayLabel(d.dayIso, { weekday: "long" }))) + '</em></h3>' +
+       '<div class="dash-sub">' + dashEsc(progDayLabel(d.dayIso, { weekday: "long", day: "numeric", month: "long" })) + ' · tap a plot to open its checklist</div>' +
+       '<div class="td-seg"><button data-v="plot"' + (todayView === "plot" ? ' class="on"' : '') + '>By plot</button><button data-v="trade"' + (todayView === "trade" ? ' class="on"' : '') + '>By trade</button></div>';
+  if(!d.on.length) h += '<div class="dash-empty">Nothing on the programme for this day.</div>';
+  else if(todayView === "plot"){
+    const by = {};
+    d.on.forEach(x => (by[x.a.p] = by[x.a.p] || []).push(x));
+    Object.keys(by).sort(progPlotOrder).forEach(no => {
+      h += '<div class="td-row" data-plot="' + dashEsc("Plot " + no) + '"><div class="td-rh">' + todayPlotHead(no, prog) +
+        (latePlots.has(no) ? '<span class="td-flag">late item</span>' : '') + '</div>' +
+        '<div class="td-acts">' + by[no].map(x => todayChip(prog, x)).join("") + '</div></div>';
+    });
+  } else {
+    const by = {};
+    d.on.forEach(x => (by[x.a.t || x.a.l] = by[x.a.t || x.a.l] || []).push(x));
+    Object.keys(by).sort((a, b) => by[b].length - by[a].length || a.localeCompare(b)).forEach(t => {
+      const xs = by[t].sort((p, q) => progPlotOrder(p.a.p, q.a.p));
+      h += '<div class="td-row"><div class="td-rh"><i class="td-dot" style="background:' + dashEsc(progTradeColour(prog, xs[0].a)) + '"></i><b>' + dashEsc(t) + '</b>' +
+        '<span class="td-cnt">' + xs.length + (xs.length === 1 ? ' plot' : ' plots') + '</span></div><div class="td-acts">' +
+        xs.map(x => {
+          const done = x.m.state === "done";
+          const when = x.of <= 1 ? "today only" : x.n >= x.of ? "last day" : "day " + x.n + "/" + x.of;
+          return '<span class="td-plot' + (done ? ' done' : '') + '" data-plot="' + dashEsc("Plot " + x.a.p) + '">' + dashEsc("Plot " + x.a.p) + '<small>' + (done ? '✓' : dashEsc(when)) + '</small></span>';
+        }).join("") + '</div></div>';
+    });
+  }
+  h += '</div>';
+
+  /* should have finished, but not ticked */
+  h += '<div class="dash-card"><h3>Should have <em>finished</em></h3>' +
+       '<div class="dash-sub">Programme finish date has gone by and the job isn\'t ticked in Site Progress</div>';
+  if(!d.late.length) h += '<div class="dash-empty">Nothing late — every finished programme job is ticked off.</div>';
+  else {
+    const by = {};
+    d.late.forEach(x => (by[x.a.p] = by[x.a.p] || []).push(x));
+    Object.keys(by).sort((a, b) => Math.max(...by[b].map(x => x.by)) - Math.max(...by[a].map(x => x.by)) || progPlotOrder(a, b)).forEach(no => {
+      h += '<div class="td-row" data-plot="' + dashEsc("Plot " + no) + '"><div class="td-rh">' + todayPlotHead(no, prog) + '</div><div class="td-late">' +
+        by[no].sort((p, q) => q.by - p.by).map(x => '<div class="td-li"><i style="background:' + dashEsc(progTradeColour(prog, x.a)) + '"></i><span>' + dashEsc(x.a.l || x.a.t) +
+          (x.m.stage ? '<small>' + dashEsc(x.m.stage.name) + ' checklist</small>' : '') + '</span>' +
+          '<em>' + (x.by <= 0 ? 'due ' : x.by + (x.by === 1 ? ' day' : ' days') + ' late · ') + 'was due ' + dashEsc(progDayLabel(x.a.e)) + '</em></div>').join("") +
+        '</div></div>';
+    });
+  }
+  h += '</div>';
+
+  /* plot hasn't reached the stage the programme has finished — behind, or not moved on in the app */
+  if(d.behind.length){
+    const by = {};
+    d.behind.forEach(x => (by[x.a.p] = by[x.a.p] || []).push(x));
+    const nos = Object.keys(by).sort(progPlotOrder);
+    h += '<div class="dash-card td-behind' + (todayBehindOpen ? ' open' : '') + '"><h3 class="td-tog">Behind the <em>programme</em><span class="td-cnt">' + nos.length + (nos.length === 1 ? ' plot' : ' plots') + ' ▾</span></h3>' +
+         '<div class="dash-sub">The programme has these jobs finished, but the plot is still at an earlier stage here — behind, or not moved on in the app yet</div><div class="td-bbody">';
+    nos.forEach(no => {
+      const xs = by[no].sort((p, q) => q.by - p.by);
+      h += '<div class="td-row" data-plot="' + dashEsc("Plot " + no) + '"><div class="td-rh">' + todayPlotHead(no, prog) + '</div>' +
+        '<div class="td-bl">' + xs.map(x => dashEsc(x.a.l || x.a.t) + ' <em>due ' + dashEsc(progDayLabel(x.a.e, { day: "numeric", month: "short" })) + '</em>').join(" · ") + '</div></div>';
+    });
+    h += '</div></div>';
+  }
+
+  body.innerHTML = h;
+  const tog = body.querySelector(".td-tog");
+  if(tog) tog.onclick = () => { todayBehindOpen = !todayBehindOpen; tog.parentNode.classList.toggle("open", todayBehindOpen); };
+  document.getElementById("td-sync").onclick = e => progSyncNow(e.currentTarget);
+  body.querySelectorAll(".td-seg button").forEach(b => b.onclick = () => { todayView = b.dataset.v; renderToday(); });
+  body.querySelectorAll("[data-plot]").forEach(el => el.onclick = e => { e.stopPropagation(); jumpToPlot(el.dataset.plot); });
 }
 
 function openPlan(){
@@ -5331,6 +5665,7 @@ function syncSubscribe(){
       const k = (payload.new && payload.new.key) || (payload.old && payload.old.key);
       const v = payload.new && payload.new.version;
       if(k === "plan"){ planSyncCheck(); return; }
+      if(k === "programme"){ progFetch(); return; }
       const base = syncMeta.base[k];
       if(k && !(base && base.version === v)) syncPull([k]);
     })
@@ -5472,6 +5807,7 @@ async function afterSignIn(){
     await syncFirst();
     syncSubscribe();
     planSyncCheck();
+    progFetch();
   }catch(e){ console.warn(e); setSyncStatus("error"); }
 }
 
@@ -5501,9 +5837,9 @@ async function syncInit(){
   showAuth(setup ? "setup" : "signin");
 }
 
-window.addEventListener("online", () => { if(syncReady){ syncPull(); planSyncCheck(); } });
+window.addEventListener("online", () => { if(syncReady){ syncPull(); planSyncCheck(); progFetch(); } });
 window.addEventListener("offline", () => { if(syncReady) setSyncStatus("offline"); });
-document.addEventListener("visibilitychange", () => { if(!document.hidden && syncReady) syncPull(); });
+document.addEventListener("visibilitychange", () => { if(!document.hidden && syncReady){ syncPull(); progFetch(); } });
 setInterval(() => { if(syncReady && !document.hidden) syncPull(); }, 60000);
 
 /* ---- account & team sheet (tap the logo) ---- */
