@@ -604,6 +604,26 @@
   #today-btn:active{transform:scale(.93);}
   #today-btn svg{width:18px;height:18px;}
   #today-btn ~ #dash-btn{margin-left:0;}
+  .td-tabs{display:grid;grid-template-columns:1fr 1fr;background:#fff;border-radius:99px;padding:4px;box-shadow:var(--shadow);margin-bottom:12px;}
+  .td-tabs button{border:none;background:transparent;font:inherit;font-size:14px;font-weight:800;color:var(--ink-soft);padding:9px 0;border-radius:99px;cursor:pointer;}
+  .td-tabs button.on{background:var(--grad);color:#fff;box-shadow:var(--glow);}
+  .wk-grid{display:grid;gap:3px;align-items:center;margin-top:4px;}
+  .wk-dh{text-align:center;font-size:9.5px;font-weight:700;color:var(--ink-soft);line-height:1.15;padding-bottom:2px;}
+  .wk-dh b{display:block;font-size:11px;color:var(--ink);}
+  .wk-dh.now b{color:#fff;background:var(--blue);border-radius:6px;margin:0 1px;}
+  .wk-dh.gap, .wk-c.gap{margin-left:5px;}
+  .wk-tl{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+  .wk-tl i{width:8px;height:8px;border-radius:3px;flex-shrink:0;}
+  .wk-c{height:24px;border:none;border-radius:5px;padding:0;font:inherit;font-size:11px;font-weight:800;color:var(--ink);background:rgba(9,132,227,var(--a));cursor:pointer;min-width:0;}
+  .wk-c.dark{color:#fff;}
+  .wk-c.empty{background:var(--bg);cursor:default;}
+  .wk-c.hot{background:#E0485A;color:#fff;}
+  .wk-c.sel{box-shadow:0 0 0 2px var(--ink);}
+  .wk-more{display:block;margin:10px auto 0;border:none;background:var(--blue-soft);color:var(--blue);font:inherit;font-size:12.5px;font-weight:800;padding:7px 14px;border-radius:99px;cursor:pointer;}
+  .wk-legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11px;font-weight:600;color:var(--ink-soft);margin-top:10px;}
+  .wk-legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+  .wk-legend i.lo{background:rgba(9,132,227,.2);} .wk-legend i.hi{background:rgba(9,132,227,.95);} .wk-legend i.hot{background:#E0485A;}
+  .wk-detail{margin-top:12px;padding:10px 12px;background:var(--bg);border-radius:14px;font-size:13px;}
   .td-sync{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600;color:var(--ink-soft);margin:0 2px 12px;}
   .td-sync span{flex:1;line-height:1.3;}
   .td-syncbtn{border:none;border-radius:99px;background:var(--blue-soft);color:var(--blue);font:inherit;font-weight:800;font-size:12.5px;padding:8px 14px;cursor:pointer;}
@@ -878,7 +898,7 @@
     <button id="today-close" aria-label="Close">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </button>
-    <span class="plan-title">Today <span style="color:var(--blue)">on site</span></span>
+    <span class="plan-title" id="today-title">Today <span style="color:var(--blue)">on site</span></span>
   </div>
   <div class="dash-scroll" id="today-body"></div>
 </div>
@@ -900,7 +920,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 71 · 19 Oct";
+const BUILD = "build 72 · 19 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -4869,7 +4889,7 @@ function progSyncedText(prog){
 /* ============================================================
    Today on site — who should be where, and what's late
    ============================================================ */
-let todayView = "plot", todayBehindOpen = false;
+let todayView = "plot", todayBehindOpen = false, todayTab = "today";
 function openToday(){
   renderToday();
   document.getElementById("today-overlay").hidden = false;
@@ -4958,10 +4978,21 @@ function renderToday(){
     document.getElementById("td-sync").onclick = e => progSyncNow(e.currentTarget);
     return;
   }
+  const tabs = '<div class="td-tabs"><button data-tab="today"' + (todayTab === "today" ? ' class="on"' : '') + '>Today</button>' +
+               '<button data-tab="week"' + (todayTab === "week" ? ' class="on"' : '') + '>2 weeks</button></div>';
+  const bindTabs = () => body.querySelectorAll(".td-tabs button").forEach(b => b.onclick = () => { todayTab = b.dataset.tab; renderToday(); body.scrollTop = 0; });
+  document.getElementById("today-title").innerHTML = todayTab === "week" ? 'Two weeks <span style="color:var(--blue)">by trade</span>' : 'Today <span style="color:var(--blue)">on site</span>';
+  if(todayTab === "week"){
+    body.innerHTML = syncBar + tabs + renderWeekBody(prog);
+    document.getElementById("td-sync").onclick = e => progSyncNow(e.currentTarget);
+    bindTabs(); bindWeekBody(body);
+    body.querySelectorAll("[data-plot]").forEach(el => el.onclick = e => { e.stopPropagation(); jumpToPlot(el.dataset.plot); });
+    return;
+  }
   const d = todayData(prog);
   const plotsOn = new Set(d.on.map(x => x.a.p));
   const latePlots = new Set(d.late.map(x => x.a.p));
-  h += syncBar;
+  h += syncBar + tabs;
   if(!d.isToday) h += '<div class="td-note">No work programmed today — showing ' + dashEsc(progDayLabel(d.dayIso, { weekday: "long", day: "numeric", month: "short" })) + '.</div>';
   h += '<div class="dash-kpis td-kpis">' +
     '<div class="dash-kpi"><b>' + plotsOn.size + '</b><span>Plots being worked</span></div>' +
@@ -5034,6 +5065,7 @@ function renderToday(){
   const tog = body.querySelector(".td-tog");
   if(tog) tog.onclick = () => { todayBehindOpen = !todayBehindOpen; tog.parentNode.classList.toggle("open", todayBehindOpen); };
   document.getElementById("td-sync").onclick = e => progSyncNow(e.currentTarget);
+  bindTabs();
   body.querySelectorAll(".td-seg button").forEach(b => b.onclick = () => { todayView = b.dataset.v; renderToday(); });
   body.querySelectorAll("[data-plot]").forEach(el => el.onclick = e => { e.stopPropagation(); jumpToPlot(el.dataset.plot); });
 }
@@ -5164,6 +5196,116 @@ function plotProgStrip(plot){
   else h += '<div class="pstrip-list">' + items.join("") + '</div>';
   wrap.innerHTML = h;
   return wrap;
+}
+
+/* ============================================================
+   Two weeks by trade — load chart (plots per trade per day) and
+   each trade's plots for the week
+   ============================================================ */
+/* a heavy day: at least half as many plots again as that trade usually has on a working day, and 4+ */
+function weekHot(t){
+  const ns = t.cells.map(c => c.length).filter(Boolean).sort((a, b) => a - b);
+  const med = ns.length ? (ns.length % 2 ? ns[(ns.length - 1) / 2] : (ns[ns.length / 2 - 1] + ns[ns.length / 2]) / 2) : 0;
+  return Math.max(4, Math.ceil(med * 1.5));
+}
+let weekSel = 0, weekCell = null, weekAllTrades = false;
+function weekData(prog){
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  for(let i = 0; i < 14 && !progWorking(first, prog); i++) first.setDate(first.getDate() + 1);
+  const mon = new Date(first); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
+  const days = [];                                   /* working days of this week and next */
+  for(let i = 0; i < 14; i++){ const d = new Date(mon); d.setDate(d.getDate() + i); if(progWorking(d, prog)) days.push({ iso: isoLocal(d), wk: i < 7 ? 0 : 1, d }); }
+  const lo = days.length ? days[0].iso : "", hi = days.length ? days[days.length - 1].iso : "";
+  const trades = {};
+  const ctx = { taskStage: progTaskStages() };
+  prog.acts.forEach(a => {
+    if(a.st === "complete" || a.k === "milestone" || a.e < lo || a.s > hi) return;
+    const t = a.t || a.l || "Other";
+    const tr = trades[t] = trades[t] || { name: t, colour: progTradeColour(prog, a), cells: days.map(() => []), acts: [], total: 0 };
+    tr.acts.push({ a, m: progMatch(a.p, a.l, ctx) });
+    days.forEach((d, i) => { if(a.s <= d.iso && a.e >= d.iso && !tr.cells[i].includes(a.p)){ tr.cells[i].push(a.p); tr.total++; } });
+  });
+  const list = Object.values(trades).filter(t => t.total).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+  const max = Math.max(1, ...list.map(t => Math.max(...t.cells.map(c => c.length))));
+  return { days, list, max, todayIso: isoLocal(new Date()) };
+}
+function renderWeekBody(prog){
+  const w = weekData(prog);
+  let h = "";
+  if(!w.list.length) return '<div class="dash-card"><div class="dash-empty">Nothing on the programme for these two weeks.</div></div>';
+  /* load chart */
+  const shown = weekAllTrades ? w.list : w.list.slice(0, 12);
+  const cols = w.days.length;
+  h += '<div class="dash-card"><h3>Trade load <em>per day</em></h3>' +
+       '<div class="dash-sub">Number of plots each trade is programmed on · tap a square to see which plots</div>' +
+       '<div class="wk-grid" style="grid-template-columns:96px repeat(' + cols + ',1fr)">';
+  h += '<span></span>' + w.days.map((d, i) => '<span class="wk-dh' + (d.iso === w.todayIso ? ' now' : '') + (i && d.wk !== w.days[i - 1].wk ? ' gap' : '') + '">' +
+       d.d.toLocaleDateString(undefined, { weekday: "narrow" }) + '<b>' + d.d.getDate() + '</b></span>').join("");
+  shown.forEach(t => {
+    const hotAt = weekHot(t);
+    h += '<span class="wk-tl"><i style="background:' + dashEsc(t.colour) + '"></i>' + dashEsc(t.name) + '</span>';
+    t.cells.forEach((c, i) => {
+      const n = c.length, sel = weekCell && weekCell.t === t.name && weekCell.i === i;
+      const gap = i && w.days[i].wk !== w.days[i - 1].wk ? ' gap' : '';
+      if(!n){ h += '<span class="wk-c empty' + gap + '"></span>'; return; }
+      const hot = n >= hotAt;
+      const a = (0.16 + 0.84 * n / w.max).toFixed(2);
+      h += '<button class="wk-c' + (hot ? ' hot' : '') + (sel ? ' sel' : '') + (a > 0.55 && !hot ? ' dark' : '') + gap + '" data-t="' + dashEsc(t.name) + '" data-i="' + i + '"' +
+           (hot ? '' : ' style="--a:' + a + '"') + ' title="' + dashEsc(t.name + ' · ' + progDayLabel(w.days[i].iso) + ': ' + n + (n === 1 ? ' plot' : ' plots')) + '">' + n + '</button>';
+    });
+  });
+  h += '</div>';
+  if(w.list.length > 12) h += '<button class="wk-more">' + (weekAllTrades ? 'Show top 12 trades' : 'Show all ' + w.list.length + ' trades') + '</button>';
+  h += '<div class="wk-legend"><span><i class="lo"></i>fewer plots</span><span><i class="hi"></i>more plots</span><span><i class="hot"></i>much busier than usual for that trade</span></div>';
+  if(weekCell){
+    const t = w.list.find(x => x.name === weekCell.t), d = w.days[weekCell.i];
+    if(t && d){
+      h += '<div class="wk-detail"><b>' + dashEsc(t.name) + '</b> · ' + dashEsc(progDayLabel(d.iso, { weekday: "long", day: "numeric", month: "short" })) + '<div class="td-acts">' +
+        t.cells[weekCell.i].slice().sort(progPlotOrder).map(no => '<span class="td-plot" data-plot="' + dashEsc("Plot " + no) + '">' + dashEsc("Plot " + no) + '</span>').join("") + '</div></div>';
+    }
+  }
+  h += '</div>';
+
+  /* this week / next week by trade */
+  const wkDays = w.days.filter(d => d.wk === weekSel);
+  h += '<div class="dash-card"><h3>' + (weekSel ? 'Next week' : 'This week') + ' <em>by trade</em></h3>' +
+       '<div class="dash-sub">' + (wkDays.length ? 'w/c ' + dashEsc(progDayLabel(wkDays[0].iso, { weekday: "short", day: "numeric", month: "short" })) : '') + ' · tap a plot to open its checklist</div>' +
+       '<div class="td-seg"><button data-w="0"' + (weekSel ? '' : ' class="on"') + '>This week</button><button data-w="1"' + (weekSel ? ' class="on"' : '') + '>Next week</button></div>';
+  if(!wkDays.length) h += '<div class="dash-empty">No working days.</div>';
+  else {
+    const lo = wkDays[0].iso, hi = wkDays[wkDays.length - 1].iso;
+    const dayName = iso => progDayLabel(iso, { weekday: "short" });
+    let any = false;
+    w.list.forEach(t => {
+      const xs = t.acts.filter(x => x.a.e >= lo && x.a.s <= hi).sort((p, q) => p.a.s < q.a.s ? -1 : p.a.s > q.a.s ? 1 : progPlotOrder(p.a.p, q.a.p));
+      if(!xs.length) return;
+      any = true;
+      const plots = new Set(xs.map(x => x.a.p));
+      h += '<div class="td-row wk-tr"><div class="td-rh"><i class="td-dot" style="background:' + dashEsc(t.colour) + '"></i><b>' + dashEsc(t.name) + '</b>' +
+        '<span class="td-cnt">' + plots.size + (plots.size === 1 ? ' plot' : ' plots') + '</span></div><div class="td-acts">' +
+        xs.map(x => {
+          const s = x.a.s < lo ? lo : x.a.s, e = x.a.e > hi ? hi : x.a.e;
+          const when = s === e ? dayName(s) : dayName(s) + "–" + dayName(e);
+          const done = x.m.state === "done";
+          return '<span class="td-plot' + (done ? ' done' : '') + '" data-plot="' + dashEsc("Plot " + x.a.p) + '">' + dashEsc("Plot " + x.a.p) +
+            '<small>' + (done ? '✓ ' : '') + dashEsc(when) + '</small></span>';
+        }).join("") + '</div></div>';
+    });
+    if(!any) h += '<div class="dash-empty">Nothing on the programme this week.</div>';
+  }
+  h += '</div>';
+  return h;
+}
+function bindWeekBody(body){
+  body.querySelectorAll(".wk-c[data-t]").forEach(b => b.onclick = () => {
+    const c = { t: b.dataset.t, i: +b.dataset.i };
+    weekCell = weekCell && weekCell.t === c.t && weekCell.i === c.i ? null : c;
+    const y = body.scrollTop; renderToday(); body.scrollTop = y;
+  });
+  const more = body.querySelector(".wk-more");
+  if(more) more.onclick = () => { weekAllTrades = !weekAllTrades; const y = body.scrollTop; renderToday(); body.scrollTop = y; };
+  body.querySelectorAll(".td-seg button[data-w]").forEach(b => b.onclick = () => { weekSel = +b.dataset.w; const y = body.scrollTop; renderToday(); body.scrollTop = y; });
 }
 
 function openPlan(){
