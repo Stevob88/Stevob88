@@ -938,7 +938,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 76 · 21 Oct";
+const BUILD = "build 77 · 21 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -5455,6 +5455,11 @@ function exportTodayPDF(){
   const prevIso = isoLocal(prev);
   const yest = new Date(); yest.setDate(yest.getDate() - 1);
   const prevOn = progOnDay(prog, prevIso);
+  const next = isoToDate(d.dayIso);
+  for(let i = 0; i < 14; i++){ next.setDate(next.getDate() + 1); if(progWorking(next, prog)) break; }
+  const nextIso = isoLocal(next);
+  const tmrw = new Date(); tmrw.setDate(tmrw.getDate() + 1);
+  const nextOn = progOnDay(prog, nextIso);
   const doc = new lib.jsPDF({ unit: "pt", format: "a4" });
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
   const mx = 36, bottom = 54;
@@ -5589,6 +5594,8 @@ function exportTodayPDF(){
   const lbl = iso => progDayLabel(iso, { weekday: "long", day: "numeric", month: "short" });
   const view = todayView === "trade" ? "by trade" : "by plot";
   drawWho("Who should be where — " + (d.isToday ? "today" : lbl(d.dayIso)), view, d.on);
+  newPage();
+  drawWho("Who should be where — " + (nextIso === isoLocal(tmrw) ? "tomorrow, " : "next working day, ") + lbl(nextIso), "get ready", nextOn);
   newPage();
   drawWho("Who should have been where — " + (prevIso === isoLocal(yest) ? "yesterday, " : "") + lbl(prevIso), "tick what got done", prevOn);
 
