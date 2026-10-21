@@ -935,7 +935,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 74 · 21 Oct";
+const BUILD = "build 75 · 21 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -5432,12 +5432,26 @@ function bindChangesBody(body){
 }
 
 /* ---- Today as a printable A4 check sheet: a box to tick and room for notes on every job ---- */
+/* every programme bar on a given day, with how far through it is and whether it's ticked */
+function progOnDay(prog, dayIso){
+  const ctx = { taskStage: progTaskStages() }, on = [];
+  prog.acts.forEach(a => {
+    if(a.st === "complete" || a.s > dayIso || a.e < dayIso) return;
+    on.push({ a, m: progMatch(a.p, a.l, ctx), n: progWorkDays(a.s, dayIso, prog), of: Math.max(1, a.d || 1) });
+  });
+  return on;
+}
 function exportTodayPDF(){
   const lib = window.jspdf || {};
   if(!lib.jsPDF){ showToast("PDF library not loaded — check connection"); return; }
   const prog = bfP();
   if(!prog){ showToast("No programme yet — tap Sync now"); return; }
   const d = todayData(prog);
+  const prev = isoToDate(d.dayIso);
+  for(let i = 0; i < 14; i++){ prev.setDate(prev.getDate() - 1); if(progWorking(prev, prog)) break; }
+  const prevIso = isoLocal(prev);
+  const yest = new Date(); yest.setDate(yest.getDate() - 1);
+  const prevOn = progOnDay(prog, prevIso);
   const doc = new lib.jsPDF({ unit: "pt", format: "a4" });
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
   const mx = 36, bottom = 54;
@@ -5511,15 +5525,16 @@ function exportTodayPDF(){
   const plotsOn = new Set(d.on.map(x => x.a.p));
   doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(60, 70, 80);
   doc.text(plotsOn.size + " plots being worked  ·  " + d.on.length + " trade activities  ·  " + new Set(d.on.map(x => x.a.t)).size +
-    " trades on site  ·  " + d.late.length + " late" + (d.isToday ? "" : "  ·  no work programmed today, showing the next working day"), mx, y);
+    " trades on site" + (d.isToday ? "" : "  ·  no work programmed today, showing the next working day"), mx, y);
   y += 22;
 
-  /* 1. who should be where */
-  section("Who should be where", todayView === "trade" ? "by trade" : "by plot");
-  if(!d.on.length){ doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(94, 106, 117); doc.text("Nothing on the programme for this day.", mx, y); y += 20; }
+  /* who should be where: today, then the previous working day to check it got done */
+  const drawWho = (title, sub, list) => {
+  section(title, sub);
+  if(!list.length){ doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(94, 106, 117); doc.text("Nothing on the programme for this day.", mx, y); y += 20; }
   else if(todayView === "trade"){
     const by = {};
-    d.on.forEach(x => (by[x.a.t || x.a.l] = by[x.a.t || x.a.l] || []).push(x));
+    list.forEach(x => (by[x.a.t || x.a.l] = by[x.a.t || x.a.l] || []).push(x));
     Object.keys(by).sort((a, b) => by[b].length - by[a].length || a.localeCompare(b)).forEach(t => {
       const xs = by[t].sort((p, q) => progPlotOrder(p.a.p, q.a.p));
       need(40);
@@ -5545,7 +5560,7 @@ function exportTodayPDF(){
   } else {
     colHead("PLOT", "JOB", "DAY");
     const by = {};
-    d.on.forEach(x => (by[x.a.p] = by[x.a.p] || []).push(x));
+    list.forEach(x => (by[x.a.p] = by[x.a.p] || []).push(x));
     Object.keys(by).sort(progPlotOrder).forEach(no => {
       const xs = by[no];
       need(xs.length * 22 + 6);
@@ -5567,43 +5582,12 @@ function exportTodayPDF(){
     });
   }
 
-  /* 2. late */
-  y += 8;
-  section("Should have finished", "programme finish has gone by, not ticked");
-  if(!d.late.length){ doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(94, 106, 117); doc.text("Nothing late — every finished programme job is ticked off.", mx, y); y += 20; }
-  else {
-    colHead("PLOT", "JOB", "LATE");
-    d.late.slice().sort((p, q) => q.by - p.by || progPlotOrder(p.a.p, q.a.p)).forEach(x => {
-      need(26);
-      box(cBox, y, false);
-      plotCell(x.a.p, cPlot, y);
-      jobCell(x.a, cJob, y, false);
-      doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.setTextColor(210, 60, 78);
-      doc.text((x.by > 0 ? x.by + (x.by === 1 ? " day" : " days") : "due"), cWhen, y);
-      doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(94, 106, 117);
-      doc.text("was " + progDayLabel(x.a.e, { day: "numeric", month: "short" }), cWhen, y + 10);
-      noteLine();
-      y += 24;
-    });
-  }
-
-  /* 3. behind the programme (short list) */
-  if(d.behind.length){
-    y += 8;
-    section("Behind the programme", "programme has these done, plot is at an earlier stage here");
-    const by = {};
-    d.behind.forEach(x => (by[x.a.p] = by[x.a.p] || []).push(x));
-    Object.keys(by).sort(progPlotOrder).forEach(no => {
-      const txt = by[no].map(x => (x.a.l || x.a.t) + " (due " + progDayLabel(x.a.e, { day: "numeric", month: "short" }) + ")").join(", ");
-      doc.setFont("helvetica", "normal"); doc.setFontSize(9.5);
-      const lines = doc.splitTextToSize(txt, W - mx - cJob);
-      need(lines.length * 12 + 8);
-      plotCell(no, cPlot, y);
-      doc.setTextColor(60, 70, 80); doc.setFont("helvetica", "normal"); doc.setFontSize(9.5);
-      lines.forEach((ln, i) => doc.text(ln, cJob, y + i * 12));
-      y += Math.max(htOf(no) ? 22 : 16, lines.length * 12 + 6);
-    });
-  }
+  };
+  const lbl = iso => progDayLabel(iso, { weekday: "long", day: "numeric", month: "short" });
+  const view = todayView === "trade" ? "by trade" : "by plot";
+  drawWho("Who should be where — " + (d.isToday ? "today" : lbl(d.dayIso)), view, d.on);
+  newPage();
+  drawWho("Who should have been where — " + (prevIso === isoLocal(yest) ? "yesterday, " : "") + lbl(prevIso), "tick what got done", prevOn);
 
   /* sign-off */
   need(50);
