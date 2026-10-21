@@ -638,6 +638,7 @@
   .chg-t small{flex-basis:100%;order:3;font-size:12px;color:var(--ink-soft);font-weight:500;}
   .chg-t em{margin-left:auto;font-style:normal;font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:99px;}
   .chg-t em.slip{background:#FDE6E9;color:#D23C4E;} .chg-t em.fwd{background:#DDF7F6;color:#00A19D;}
+  .td-print{margin:0 0 14px;}
   .td-sync{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600;color:var(--ink-soft);margin:0 2px 12px;}
   .td-sync span{flex:1;line-height:1.3;}
   .td-syncbtn{border:none;border-radius:99px;background:var(--blue-soft);color:var(--blue);font:inherit;font-weight:800;font-size:12.5px;padding:8px 14px;cursor:pointer;}
@@ -934,7 +935,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 73 · 19 Oct";
+const BUILD = "build 74 · 21 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -5022,6 +5023,7 @@ function renderToday(){
     '<div class="dash-kpi"><b>' + d.on.length + '</b><span>Trade activities</span></div>' +
     '<div class="dash-kpi' + (d.late.length ? ' warn' : '') + '"><b>' + d.late.length + '</b><span>Late — not ticked</span></div>' +
     '<div class="dash-kpi"><b>' + new Set(d.on.map(x => x.a.t)).size + '</b><span>Trades on site</span></div></div>';
+  h += '<button class="calloff-export td-print" id="td-print">' + ICON.doc + ' Print today\'s check sheet (PDF)</button>';
 
   /* who should be where */
   h += '<div class="dash-card"><h3>Who should be where <em>' + (d.isToday ? 'today' : dashEsc(progDayLabel(d.dayIso, { weekday: "long" }))) + '</em></h3>' +
@@ -5089,6 +5091,7 @@ function renderToday(){
   if(tog) tog.onclick = () => { todayBehindOpen = !todayBehindOpen; tog.parentNode.classList.toggle("open", todayBehindOpen); };
   document.getElementById("td-sync").onclick = e => progSyncNow(e.currentTarget);
   bindTabs();
+  document.getElementById("td-print").onclick = exportTodayPDF;
   body.querySelectorAll(".td-seg button").forEach(b => b.onclick = () => { todayView = b.dataset.v; renderToday(); });
   body.querySelectorAll("[data-plot]").forEach(el => el.onclick = e => { e.stopPropagation(); jumpToPlot(el.dataset.plot); });
 }
@@ -5426,6 +5429,192 @@ function renderChangesBody(prog){
 function bindChangesBody(body){
   body.querySelectorAll(".chg-weeks button").forEach(b => b.onclick = () => { chgBase = b.dataset.k; chgShowAll = {}; renderToday(); });
   body.querySelectorAll("[data-more]").forEach(b => b.onclick = e => { e.stopPropagation(); chgShowAll[b.dataset.more] = !chgShowAll[b.dataset.more]; const y = body.scrollTop; renderToday(); body.scrollTop = y; });
+}
+
+/* ---- Today as a printable A4 check sheet: a box to tick and room for notes on every job ---- */
+function exportTodayPDF(){
+  const lib = window.jspdf || {};
+  if(!lib.jsPDF){ showToast("PDF library not loaded — check connection"); return; }
+  const prog = bfP();
+  if(!prog){ showToast("No programme yet — tap Sync now"); return; }
+  const d = todayData(prog);
+  const doc = new lib.jsPDF({ unit: "pt", format: "a4" });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  const mx = 36, bottom = 54;
+  const site = (prog.site && prog.site.name) || (plotInfo && plotInfo.site) || "Site";
+  const dayLong = progDayLabel(d.dayIso, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const rgb = hex => { const m = String(hex || "").replace("#", "").match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i); return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [148, 163, 184]; };
+  const htOf = no => houseType("Plot " + no) || (((prog.plots || []).find(p => p.no === String(no)) || {}).ht || "");
+  const stOf = no => { const s = state.find(st => !st.basic && st.progNo && st.plots.some(p => p.name === "Plot " + no)); return s ? "S" + s.progNo : ""; };
+  let y = 0, page = 1;
+
+  const box = (x, yy, ticked) => {
+    doc.setDrawColor(120, 130, 140); doc.setLineWidth(0.9); doc.rect(x, yy - 9, 11, 11);
+    if(ticked){ doc.setDrawColor(0, 161, 157); doc.setLineWidth(1.8); doc.line(x + 2, yy - 3.5, x + 4.6, yy - 0.5); doc.line(x + 4.6, yy - 0.5, x + 9.5, yy - 7); }
+  };
+  const footer = () => {
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(94, 106, 117);
+    doc.text(site + "  ·  Today on site  ·  " + dayLong, mx, H - 24);
+    doc.text("Page " + page, W - mx, H - 24, { align: "right" });
+  };
+  const head = contd => {
+    y = 46;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(30, 39, 46);
+    doc.text("Today on site" + (contd ? " (cont.)" : ""), mx, y);
+    doc.setFontSize(12); doc.setTextColor(9, 132, 227);
+    doc.text(dayLong, W - mx, y, { align: "right" });
+    y += 16;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(94, 106, 117);
+    doc.text(site + "  ·  " + progSyncedText(prog), mx, y);
+    y += 10;
+    doc.setDrawColor(9, 132, 227); doc.setLineWidth(1.2); doc.line(mx, y, W - mx, y);
+    y += 18;
+  };
+  const newPage = () => { footer(); doc.addPage(); page++; head(true); };
+  const need = n => { if(y + n > H - bottom) newPage(); };
+  const section = (title, sub) => {
+    need(46);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(30, 39, 46);
+    doc.text(title, mx, y);
+    if(sub){ doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(94, 106, 117); doc.text(sub, W - mx, y, { align: "right" }); }
+    y += 14;
+  };
+  /* column positions */
+  const cBox = mx, cPlot = mx + 18, cJob = mx + 150, cWhen = mx + 330, cNote = mx + 400;
+  const colHead = (a, b, c) => {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(94, 106, 117);
+    doc.text(a, cPlot, y); doc.text(b, cJob, y); doc.text(c, cWhen, y); doc.text("NOTES", cNote, y);
+    y += 5; doc.setDrawColor(226, 230, 236); doc.setLineWidth(0.8); doc.line(mx, y, W - mx, y); y += 13;
+  };
+  const noteLine = () => { doc.setDrawColor(205, 212, 220); doc.setLineWidth(0.6); doc.line(cNote, y + 2, W - mx, y + 2); };
+  const plotCell = (no, x, yy) => {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10.5); doc.setTextColor(30, 39, 46);
+    const st = stOf(no);
+    doc.text((st ? st + "  " : "") + "Plot " + no, x, yy);
+    const ht = htOf(no);
+    if(ht){ doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(0, 143, 139); doc.text(ht, x, yy + 10); }
+  };
+  const jobCell = (a, x, yy, done) => {
+    const c = rgb(progTradeColour(prog, a));
+    doc.setFillColor(c[0], c[1], c[2]); doc.roundedRect(x, yy - 7, 7, 7, 1.5, 1.5, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(done ? 140 : 30, done ? 150 : 39, done ? 158 : 46);
+    const lbl = doc.splitTextToSize(a.l || a.t || "Activity", cWhen - x - 18)[0];
+    doc.text(lbl, x + 12, yy);
+    if(a.t && progNorm(a.t) !== progNorm(a.l)){ doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(94, 106, 117); doc.text(doc.splitTextToSize(a.t, cWhen - x - 18)[0], x + 12, yy + 10); return true; }
+    return false;
+  };
+  const whenText = x => x.m && x.m.state === "done" ? "ticked"
+    : x.a.k === "milestone" ? "milestone" : x.of <= 1 ? "today only" : x.n >= x.of ? "last day" : "day " + x.n + " of " + x.of;
+
+  head(false);
+  /* summary */
+  const plotsOn = new Set(d.on.map(x => x.a.p));
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(60, 70, 80);
+  doc.text(plotsOn.size + " plots being worked  ·  " + d.on.length + " trade activities  ·  " + new Set(d.on.map(x => x.a.t)).size +
+    " trades on site  ·  " + d.late.length + " late" + (d.isToday ? "" : "  ·  no work programmed today, showing the next working day"), mx, y);
+  y += 22;
+
+  /* 1. who should be where */
+  section("Who should be where", todayView === "trade" ? "by trade" : "by plot");
+  if(!d.on.length){ doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(94, 106, 117); doc.text("Nothing on the programme for this day.", mx, y); y += 20; }
+  else if(todayView === "trade"){
+    const by = {};
+    d.on.forEach(x => (by[x.a.t || x.a.l] = by[x.a.t || x.a.l] || []).push(x));
+    Object.keys(by).sort((a, b) => by[b].length - by[a].length || a.localeCompare(b)).forEach(t => {
+      const xs = by[t].sort((p, q) => progPlotOrder(p.a.p, q.a.p));
+      need(40);
+      const c = rgb(progTradeColour(prog, xs[0].a));
+      doc.setFillColor(c[0], c[1], c[2]); doc.roundedRect(mx, y - 8, 9, 9, 2, 2, "F");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11.5); doc.setTextColor(30, 39, 46); doc.text(t, mx + 15, y);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(94, 106, 117);
+      doc.text(xs.length + (xs.length === 1 ? " plot" : " plots"), W - mx, y, { align: "right" });
+      y += 6; doc.setDrawColor(226, 230, 236); doc.setLineWidth(0.8); doc.line(mx, y, W - mx, y); y += 14;
+      xs.forEach(x => {
+        need(24);
+        const done = x.m.state === "done";
+        box(cBox, y, done);
+        plotCell(x.a.p, cPlot, y);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(done ? 0 : 94, done ? 161 : 106, done ? 157 : 117);
+        if(progNorm(x.a.l) !== progNorm(t)) { doc.setTextColor(30, 39, 46); doc.text(doc.splitTextToSize(x.a.l, cWhen - cJob - 6)[0], cJob, y); doc.setTextColor(done ? 0 : 94, done ? 161 : 106, done ? 157 : 117); }
+        doc.text(whenText(x), cWhen, y);
+        noteLine();
+        y += htOf(x.a.p) ? 22 : 18;
+      });
+      y += 6;
+    });
+  } else {
+    colHead("PLOT", "JOB", "DAY");
+    const by = {};
+    d.on.forEach(x => (by[x.a.p] = by[x.a.p] || []).push(x));
+    Object.keys(by).sort(progPlotOrder).forEach(no => {
+      const xs = by[no];
+      need(xs.length * 22 + 6);
+      const top = y;
+      plotCell(no, cPlot, y);
+      xs.forEach(x => {
+        const done = x.m.state === "done";
+        box(cBox, y, done);
+        const two = jobCell(x.a, cJob, y, done);
+        doc.setFont("helvetica", done ? "bold" : "normal"); doc.setFontSize(9.5);
+        doc.setTextColor(done ? 0 : 60, done ? 161 : 70, done ? 157 : 80);
+        doc.text(whenText(x), cWhen, y);
+        noteLine();
+        y += two ? 22 : 18;
+      });
+      if(y - top < 22) y = top + 22;
+      doc.setDrawColor(238, 241, 245); doc.setLineWidth(0.6); doc.line(mx, y - 8, W - mx, y - 8);
+      y += 4;
+    });
+  }
+
+  /* 2. late */
+  y += 8;
+  section("Should have finished", "programme finish has gone by, not ticked");
+  if(!d.late.length){ doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(94, 106, 117); doc.text("Nothing late — every finished programme job is ticked off.", mx, y); y += 20; }
+  else {
+    colHead("PLOT", "JOB", "LATE");
+    d.late.slice().sort((p, q) => q.by - p.by || progPlotOrder(p.a.p, q.a.p)).forEach(x => {
+      need(26);
+      box(cBox, y, false);
+      plotCell(x.a.p, cPlot, y);
+      jobCell(x.a, cJob, y, false);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.setTextColor(210, 60, 78);
+      doc.text((x.by > 0 ? x.by + (x.by === 1 ? " day" : " days") : "due"), cWhen, y);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(94, 106, 117);
+      doc.text("was " + progDayLabel(x.a.e, { day: "numeric", month: "short" }), cWhen, y + 10);
+      noteLine();
+      y += 24;
+    });
+  }
+
+  /* 3. behind the programme (short list) */
+  if(d.behind.length){
+    y += 8;
+    section("Behind the programme", "programme has these done, plot is at an earlier stage here");
+    const by = {};
+    d.behind.forEach(x => (by[x.a.p] = by[x.a.p] || []).push(x));
+    Object.keys(by).sort(progPlotOrder).forEach(no => {
+      const txt = by[no].map(x => (x.a.l || x.a.t) + " (due " + progDayLabel(x.a.e, { day: "numeric", month: "short" }) + ")").join(", ");
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9.5);
+      const lines = doc.splitTextToSize(txt, W - mx - cJob);
+      need(lines.length * 12 + 8);
+      plotCell(no, cPlot, y);
+      doc.setTextColor(60, 70, 80); doc.setFont("helvetica", "normal"); doc.setFontSize(9.5);
+      lines.forEach((ln, i) => doc.text(ln, cJob, y + i * 12));
+      y += Math.max(htOf(no) ? 22 : 16, lines.length * 12 + 6);
+    });
+  }
+
+  /* sign-off */
+  need(50);
+  y += 18;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(60, 70, 80);
+  doc.text("Checked by: ______________________________", mx, y);
+  doc.text("Time: __________", mx + 290, y);
+  doc.text("Signed: ________________", W - mx, y, { align: "right" });
+  footer();
+  doc.save("Today-on-site-" + d.dayIso + ".pdf");
+  showToast("Today's check sheet exported");
 }
 
 function openPlan(){
