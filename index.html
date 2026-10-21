@@ -638,7 +638,10 @@
   .chg-t small{flex-basis:100%;order:3;font-size:12px;color:var(--ink-soft);font-weight:500;}
   .chg-t em{margin-left:auto;font-style:normal;font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:99px;}
   .chg-t em.slip{background:#FDE6E9;color:#D23C4E;} .chg-t em.fwd{background:#DDF7F6;color:#00A19D;}
-  .td-print{margin:0 0 14px;}
+  .td-print{display:inline-flex;align-items:center;gap:7px;margin:0 0 14px;border:none;border-radius:99px;background:var(--grad);color:#fff;
+    box-shadow:var(--glow);font:inherit;font-size:13.5px;font-weight:700;padding:9px 16px;cursor:pointer;transition:transform .15s ease;}
+  .td-print:active{transform:scale(.96);}
+  .td-print svg{width:16px;height:16px;flex-shrink:0;}
   .td-sync{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600;color:var(--ink-soft);margin:0 2px 12px;}
   .td-sync span{flex:1;line-height:1.3;}
   .td-syncbtn{border:none;border-radius:99px;background:var(--blue-soft);color:var(--blue);font:inherit;font-weight:800;font-size:12.5px;padding:8px 14px;cursor:pointer;}
@@ -935,7 +938,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 75 · 21 Oct";
+const BUILD = "build 76 · 21 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -5023,7 +5026,7 @@ function renderToday(){
     '<div class="dash-kpi"><b>' + d.on.length + '</b><span>Trade activities</span></div>' +
     '<div class="dash-kpi' + (d.late.length ? ' warn' : '') + '"><b>' + d.late.length + '</b><span>Late — not ticked</span></div>' +
     '<div class="dash-kpi"><b>' + new Set(d.on.map(x => x.a.t)).size + '</b><span>Trades on site</span></div></div>';
-  h += '<button class="calloff-export td-print" id="td-print">' + ICON.doc + ' Print today\'s check sheet (PDF)</button>';
+  h += '<button class="td-print" id="td-print">' + ICON.doc + ' Print today\'s check sheet</button>';
 
   /* who should be where */
   h += '<div class="dash-card"><h3>Who should be where <em>' + (d.isToday ? 'today' : dashEsc(progDayLabel(d.dayIso, { weekday: "long" }))) + '</em></h3>' +
