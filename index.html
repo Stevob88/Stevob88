@@ -612,6 +612,9 @@
   .wk-dh b{display:block;font-size:11px;color:var(--ink);}
   .wk-dh.now b{color:#fff;background:var(--blue);border-radius:6px;margin:0 1px;}
   .wk-dh.gap, .wk-c.gap{margin-left:5px;}
+  .wk-gh{grid-column:1 / -1;font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--blue);margin:8px 0 1px;padding-bottom:3px;border-bottom:1px solid var(--line);}
+  .wk-gl{font-size:11.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--blue);margin:14px 0 0;padding:8px 10px;background:var(--blue-soft);border-radius:10px;}
+  .wk-gl + .td-row{border-top:none;}
   .wk-tl{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
   .wk-tl i{width:8px;height:8px;border-radius:3px;flex-shrink:0;}
   .wk-c{height:24px;border:none;border-radius:5px;padding:0;font:inherit;font-size:11px;font-weight:800;color:var(--ink);background:rgba(9,132,227,var(--a));cursor:pointer;min-width:0;}
@@ -938,7 +941,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 78 · 21 Oct";
+const BUILD = "build 79 · 22 Oct";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -5238,6 +5241,28 @@ function weekHot(t){
   return Math.max(4, Math.ceil(med * 1.5));
 }
 let weekSel = 0, weekCell = null, weekAllTrades = false;
+/* trades grouped under the firm that does them, in site order; anything else goes under Others */
+const TRADE_GROUPS = [
+  ["Scaffolder", ["Scaffold Adaption", "Scaffold", "Scaffold Strike|Scaffold Dismantle", "Scaffold up & over|Up and overs|Up & overs", "Hop Ups|Hop Up", "Garage Scaffold"]],
+  ["Roofer",     ["Felt & Batten|Felt and Batten", "Pv Panel|PV Panels", "Roof tile|Roof tiles"]],
+  ["Joiners",    ["Joiner Prefix", "Stairs", "Joiner 1st Fix", "Joiner Dropbacks|Joiner Drop backs", "Joiner 2nd fix", "Joiner Final"]],
+  ["Plumber",    ["Plumber Prefix", "Plumber 1st Fix", "Plumber 2nd fix", "Plumber final"]],
+  ["Electrical", ["Electrician Prefix|Electric Prefix", "Electrician 1st Fix|Electric 1st Fix", "Electrician 2nd fix|Electric 2nd fix", "Electrician Final|Electric Final"]],
+  ["Boarder",    ["Party Wall", "Boarder", "Taper", "Patcher", "Patcher final"]],
+  ["Painter",    ["Painter", "Mistcoat", "Paint final|Painter final"]]
+];
+const TRADE_GROUP_OF = (() => {
+  const m = {};
+  TRADE_GROUPS.forEach(([g, names], gi) => names.forEach((alts, ti) => alts.split("|").forEach(n => { m[progNorm(n)] = { g, gi, ti }; })));
+  return m;
+})();
+/* [{ name, trades }] in group order; trades in the order above, Others busiest first */
+function groupTrades(list){
+  const groups = TRADE_GROUPS.map(([g]) => ({ name: g, trades: [] })), others = { name: "Others", trades: [] };
+  list.forEach(t => { const k = TRADE_GROUP_OF[progNorm(t.name)]; (k ? groups[k.gi] : others).trades.push(t); });
+  groups.forEach(g => g.trades.sort((a, b) => TRADE_GROUP_OF[progNorm(a.name)].ti - TRADE_GROUP_OF[progNorm(b.name)].ti));
+  return groups.concat(others).filter(g => g.trades.length);
+}
 function weekData(prog){
   const now = new Date();
   const first = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -5264,14 +5289,19 @@ function renderWeekBody(prog){
   let h = "";
   if(!w.list.length) return '<div class="dash-card"><div class="dash-empty">Nothing on the programme for these two weeks.</div></div>';
   /* load chart */
-  const shown = weekAllTrades ? w.list : w.list.slice(0, 12);
   const cols = w.days.length;
+  const OTHERS_SHOWN = 6;
   h += '<div class="dash-card"><h3>Trade load <em>per day</em></h3>' +
        '<div class="dash-sub">Number of plots each trade is programmed on · tap a square to see which plots</div>' +
        '<div class="wk-grid" style="grid-template-columns:96px repeat(' + cols + ',1fr)">';
   h += '<span></span>' + w.days.map((d, i) => '<span class="wk-dh' + (d.iso === w.todayIso ? ' now' : '') + (i && d.wk !== w.days[i - 1].wk ? ' gap' : '') + '">' +
        d.d.toLocaleDateString(undefined, { weekday: "narrow" }) + '<b>' + d.d.getDate() + '</b></span>').join("");
-  shown.forEach(t => {
+  let hiddenOthers = 0;
+  groupTrades(w.list).forEach(g => {
+    let ts = g.trades;
+    if(g.name === "Others" && !weekAllTrades && ts.length > OTHERS_SHOWN){ hiddenOthers = ts.length - OTHERS_SHOWN; ts = ts.slice(0, OTHERS_SHOWN); }
+    h += '<span class="wk-gh">' + dashEsc(g.name) + '</span>';
+    ts.forEach(t => {
     const hotAt = weekHot(t);
     h += '<span class="wk-tl"><i style="background:' + dashEsc(t.colour) + '"></i>' + dashEsc(t.name) + '</span>';
     t.cells.forEach((c, i) => {
@@ -5283,9 +5313,10 @@ function renderWeekBody(prog){
       h += '<button class="wk-c' + (hot ? ' hot' : '') + (sel ? ' sel' : '') + (a > 0.55 && !hot ? ' dark' : '') + gap + '" data-t="' + dashEsc(t.name) + '" data-i="' + i + '"' +
            (hot ? '' : ' style="--a:' + a + '"') + ' title="' + dashEsc(t.name + ' · ' + progDayLabel(w.days[i].iso) + ': ' + n + (n === 1 ? ' plot' : ' plots')) + '">' + n + '</button>';
     });
+    });
   });
   h += '</div>';
-  if(w.list.length > 12) h += '<button class="wk-more">' + (weekAllTrades ? 'Show top 12 trades' : 'Show all ' + w.list.length + ' trades') + '</button>';
+  if(hiddenOthers || weekAllTrades) h += '<button class="wk-more">' + (weekAllTrades ? 'Show fewer others' : 'Show ' + hiddenOthers + ' more under Others') + '</button>';
   h += '<div class="wk-legend"><span><i class="lo"></i>fewer plots</span><span><i class="hi"></i>more plots</span><span><i class="hot"></i>much busier than usual for that trade</span></div>';
   if(weekCell){
     const t = w.list.find(x => x.name === weekCell.t), d = w.days[weekCell.i];
@@ -5306,10 +5337,13 @@ function renderWeekBody(prog){
     const lo = wkDays[0].iso, hi = wkDays[wkDays.length - 1].iso;
     const dayName = iso => progDayLabel(iso, { weekday: "short" });
     let any = false;
-    w.list.forEach(t => {
+    groupTrades(w.list).forEach(g => {
+    let gh = false;
+    g.trades.forEach(t => {
       const xs = t.acts.filter(x => x.a.e >= lo && x.a.s <= hi).sort((p, q) => p.a.s < q.a.s ? -1 : p.a.s > q.a.s ? 1 : progPlotOrder(p.a.p, q.a.p));
       if(!xs.length) return;
       any = true;
+      if(!gh){ h += '<div class="wk-gl">' + dashEsc(g.name) + '</div>'; gh = true; }
       const plots = new Set(xs.map(x => x.a.p));
       h += '<div class="td-row wk-tr"><div class="td-rh"><i class="td-dot" style="background:' + dashEsc(t.colour) + '"></i><b>' + dashEsc(t.name) + '</b>' +
         '<span class="td-cnt">' + plots.size + (plots.size === 1 ? ' plot' : ' plots') + '</span></div><div class="td-acts">' +
@@ -5320,6 +5354,7 @@ function renderWeekBody(prog){
           return '<span class="td-plot' + (done ? ' done' : '') + '" data-plot="' + dashEsc("Plot " + x.a.p) + '">' + dashEsc("Plot " + x.a.p) +
             '<small>' + (done ? '✓ ' : '') + dashEsc(when) + '</small></span>';
         }).join("") + '</div></div>';
+    });
     });
     if(!any) h += '<div class="dash-empty">Nothing on the programme this week.</div>';
   }
