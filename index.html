@@ -999,7 +999,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 81 · 12 Nov";
+const BUILD = "build 82 · 12 Nov";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -5730,7 +5730,7 @@ function exportTodayPDF(){
    Part L / fire photos. Plot positions are stored once, in plan
    page units, and shared with every device.
    ============================================================ */
-const MAP_VIEWS = [["off", "Off"], ["stage", "Build stage"], ["sales", "Sales status"], ["limit", "Build limit"], ["late", "Late & today"], ["partl", "Part L / Fire"]];
+const MAP_VIEWS = [["off", "Off"], ["stage", "Build stage"], ["sales", "Sales status"], ["limit", "Build limit"], ["claim", "Time between stage"], ["late", "Late & today"], ["partl", "Part L / Fire"]];
 const MAP_SEQ = ["#EEF1F5", "#D6E8F8", "#BBD9F3", "#9CC8EE", "#77B3E8", "#4F9DE2", "#2A88DB", "#0F74CB", "#0A5FA8", "#084B86"];
 const MAP_SALE = { F: ["#F2C230", "For sale"], R: ["#0984E3", "Reserved"], E: ["#D23C4E", "Exchanged"], L: ["#1E272E", "Legal"], W: ["#87929C", "Withdrawn"], P: ["#8E5BD6", "Pre-reserved"] };
 const MAP_STAGE_NAME = { 1: "Start founds", 2: "Starts supers", 3: "Finish supers", 4: "Finish roof", 5: "Finish 1st fix", 6: "Finish plaster", 7: "Finish sec finish", 8: "Finish paint", 9: "Completed" };
@@ -5749,6 +5749,11 @@ function mapAllPlots(){
   return [...set].sort(progPlotOrder);
 }
 /* everything the map knows about one plot */
+/* whole weeks until the claim date; negative once it has passed */
+function mapClaimWeeks(due){
+  const d = claimInfo(due).days;
+  return d >= 0 ? Math.floor(d / 7) : -Math.ceil(-d / 7);
+}
 function mapInfo(no){
   const name = "Plot " + no;
   let s = null, p = null;
@@ -5760,6 +5765,7 @@ function mapInfo(no){
   const info = { no, name, stage: s, plot: p, done, known: !!(p || done), hasCols,
     sale: pr && pr.sale || "", rel: pr && pr.rel || "", sc: pr && pr.sc ? +pr.sc : 0,
     appStage: s ? s.progNo : (done ? 9 : 0), appStarted: s ? plotStarted(p, s) : done,
+    claimDue: s && pr && pr.est ? pr.est[String(s.progNo)] || null : null,
     late: 0, today: [], partl: 0 };
   if(p){ try{ info.late = plotProgLate(p); }catch(e){} }
   const prog = bfP();
@@ -5790,6 +5796,13 @@ function mapMarkerHTML(view, i){
     if(i.today.length) return '<span class="mp-b rnd dk" style="background:#0984E3">' + i.today.length + '</span>';
     return '<span class="mp-b rnd none"></span>';
   }
+  if(view === "claim"){
+    /* weeks left to claim the stage the plot is in (claim = Friday before the programme week) */
+    if(!i.claimDue) return '<span class="mp-b rnd none"></span>';
+    const w = mapClaimWeeks(i.claimDue);
+    const bg = w < 0 ? "#D23C4E" : w <= 1 ? "#F2A93B" : "#00A19D";
+    return '<span class="mp-b' + (w < 0 || w > 1 ? ' dk' : '') + '" style="background:' + bg + '">' + w + '</span>';
+  }
   if(view === "partl"){
     if(i.partl) return '<span class="mp-b rnd" style="background:#F2A93B">' + i.partl + '</span>';
     return '<span class="mp-b rnd none' + (i.known ? ' good' : '') + '"></span>';
@@ -5810,6 +5823,7 @@ function mapLegendHTML(){
   if(mapView === "sales") return !anyCols ? need : Object.keys(MAP_SALE).slice(0, 4).map(k => dot(MAP_SALE[k][0], k + " " + MAP_SALE[k][1])).join("") + dot("#C5CCD4", "not released") + '<span>' + up.replace(" · ", "") + '</span>';
   if(mapView === "limit") return !anyCols ? need : dot("#F8DC5A", "stage-limit: room to build") + dot("#D23C4E", "at its build limit") + dot("#C5CCD4", "T / P: no limit yet") + '<span>' + up.replace(" · ", "") + '</span>';
   if(mapView === "late") return !bfP() ? '<span class="warn">Needs the BuildFlow programme — sign in and sync.</span>' : dot("#D23C4E", "jobs late on programme") + dot("#0984E3", "trades on it today") + dot("#C5CCD4", "nothing today");
+  if(mapView === "claim") return !programData ? need : dot("#00A19D", "2+ weeks to claim", 1) + dot("#F2A93B", "claim this week or next", 1) + dot("#D23C4E", "claim date passed (−weeks)", 1) + '<span>number = weeks left to claim the stage the plot is in</span>';
   if(mapView === "partl") return dot("#F2A93B", "Part L / fire photos outstanding") + dot("#00A19D", "none outstanding");
   return "";
 }
@@ -5893,6 +5907,8 @@ function mapRender(){
       rows += cell("Programme stage", i.hasCols ? (i.sc ? i.sc + " · " + MAP_STAGE_NAME[i.sc] : "Not started") : "—");
       rows += cell("My checklist", i.stage ? "S" + i.appStage + " · " + dashEsc(i.stage.name) + (i.appStarted ? "" : " (not started)") : "—");
       rows += cell("Sales status", sl ? sl[1] : (i.hasCols ? "Not released" : "—"));
+      if(i.claimDue){ const ci = claimInfo(i.claimDue), w = mapClaimWeeks(i.claimDue);
+        rows += cell("Claim S" + i.appStage, (w < 0 ? -w + (w === -1 ? " week" : " weeks") + " over" : w + (w === 1 ? " week" : " weeks") + " left") + " · " + fmtDay(ci.claim)); }
       rows += cell("Build limit", i.rel ? (/^[1-9]$/.test(i.rel) ? i.rel + " · " + MAP_STAGE_NAME[i.rel] + (i.sc >= +i.rel ? " — at limit" : "") : i.rel === "T" ? "Released for tender" : i.rel === "P" ? "Not released for tender" : dashEsc(i.rel)) : "—");
       if(i.today.length) rows += cell("On today", dashEsc(i.today.map(a => a.l || a.t).join(", ")));
       if(i.late) rows += cell("Late on programme", i.late + (i.late === 1 ? " job" : " jobs"));
