@@ -486,6 +486,57 @@
   .plan-pages[hidden]{display:none;}
   .plan-pages button{width:34px;height:34px;font-size:20px;line-height:1;}
   .plan-stage{flex:1;position:relative;overflow:hidden;touch-action:none;}
+
+  /* ---------- Site map: markers on the plan ---------- */
+  .map-bar{background:#fff;border-bottom:1px solid var(--line);padding:8px 10px 8px;}
+  .map-bar[hidden]{display:none;}
+  .map-chips{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:1px;}
+  .map-chips::-webkit-scrollbar{display:none;}
+  .map-chips button{flex-shrink:0;border:none;background:var(--bg);color:var(--ink-soft);font:inherit;font-size:12.5px;font-weight:700;padding:7px 12px;border-radius:99px;cursor:pointer;}
+  .map-chips button.on{background:var(--grad);color:#fff;box-shadow:0 6px 14px rgba(9,132,227,.28);}
+  .map-chips button.fixb{background:#fff;border:1.5px dashed #9CCBF2;color:var(--blue);padding:5.5px 12px;}
+  .map-chips button.fixb.on{border-style:solid;border-color:transparent;}
+  .map-legend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-size:11.5px;font-weight:600;color:var(--ink-soft);margin-top:7px;}
+  .map-legend[hidden]{display:none;}
+  .map-legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:4px;vertical-align:-1.5px;}
+  .map-legend .warn{color:#B4781A;font-weight:700;}
+  .mp-src{display:inline-flex;background:var(--bg);border-radius:99px;padding:2px;}
+  .mp-src button{border:none;background:transparent;font:inherit;font-size:11.5px;font-weight:700;color:var(--ink-soft);padding:4px 10px;border-radius:99px;cursor:pointer;}
+  .mp-src button.on{background:#fff;color:var(--blue);box-shadow:0 2px 6px rgba(9,100,180,.14);}
+  .map-layer{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+  .mp{position:absolute;left:0;top:0;will-change:transform;}
+  .mp-b{display:flex;align-items:center;justify-content:center;min-width:24px;height:20px;padding:0 4px;border-radius:6px;border:2px solid #fff;
+    font-size:12px;font-weight:800;line-height:1;color:var(--ink);background:#EEF1F5;box-shadow:0 2px 6px rgba(30,39,46,.28);white-space:nowrap;}
+  .mp-b.dk{color:#fff;}
+  .mp-b.rnd{min-width:22px;height:22px;border-radius:50%;padding:0;}
+  .mp-b.none{min-width:13px;width:13px;height:13px;background:#C5CCD4;}
+  .mp-b.none.good{background:#00A19D;}
+  .mp-b.done{background:#00A19D;color:#fff;}
+  .mp-b.pill{border-radius:99px;min-width:32px;height:19px;font-size:11px;}
+  .mp-b.pill.ok{background:#F8DC5A;} .mp-b.pill.at{background:#D23C4E;} .mp-b.pill.tend{background:#C5CCD4;}
+  .mp-b.num{background:#fff;color:var(--ink);font-size:11px;}
+  .mp-b.num.sel{background:var(--ink);color:#fff;}
+  .mp-dot{position:absolute;right:-4px;top:-4px;width:10px;height:10px;border-radius:50%;border:1.5px solid #fff;}
+  .mp.sel .mp-b{outline:3px solid var(--ink);outline-offset:1px;}
+  .map-layer.tiny .mp-b{font-size:0;min-width:20px;width:20px;height:20px;padding:0;border-width:3px;}
+  .map-layer.tiny .mp-b.none{min-width:13px;width:13px;height:13px;}
+  .map-layer.tiny .mp-dot{display:none;}
+  .map-card, .map-fix{position:absolute;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom) + 72px);max-width:460px;margin:0 auto;z-index:3;
+    background:#fff;border-radius:20px;box-shadow:0 12px 34px rgba(30,39,46,.22);padding:13px 14px;}
+  .map-card[hidden], .map-fix[hidden]{display:none;}
+  .mc-h{display:flex;align-items:center;gap:8px;padding-right:34px;}
+  .mc-h b{font-size:16.5px;font-weight:800;letter-spacing:-.3px;}
+  .mc-x{position:absolute;right:10px;top:10px;width:28px;height:28px;border:none;border-radius:50%;background:var(--bg);color:var(--ink-soft);font-weight:800;cursor:pointer;}
+  .mc-rows{display:grid;grid-template-columns:1fr 1fr;gap:7px 12px;margin-top:9px;}
+  .mc-rows span{display:block;font-size:11px;font-weight:600;color:var(--ink-soft);}
+  .mc-rows b{font-size:13px;font-weight:700;line-height:1.25;}
+  .mc-open{display:block;width:100%;margin-top:11px;border:none;border-radius:99px;background:var(--blue-soft);color:var(--blue);font:inherit;font-size:13.5px;font-weight:800;padding:9px;cursor:pointer;}
+  .mf-t{font-size:13px;font-weight:800;}
+  .mf-r{display:flex;gap:8px;margin-top:9px;}
+  .mf-r select{flex:1;min-width:0;border:1.5px solid var(--line);border-radius:12px;background:#fff;font:inherit;font-size:14px;font-weight:600;padding:8px 10px;color:var(--ink);}
+  .mf-r button{border:none;border-radius:99px;background:var(--bg);color:var(--ink-soft);font:inherit;font-size:12.5px;font-weight:800;padding:8px 12px;cursor:pointer;white-space:nowrap;}
+  .mf-r button.pri{background:var(--grad);color:#fff;}
+  .mf-r button:disabled{opacity:.45;}
   .plan-canvas-wrap{position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform;}
   .plan-canvas-wrap canvas{display:block;}
   .plan-empty{
@@ -861,8 +912,15 @@
     </button>
   </div>
 
+  <div class="map-bar" id="map-bar" hidden>
+    <div class="map-chips" id="map-chips"></div>
+    <div class="map-legend" id="map-legend" hidden></div>
+  </div>
   <div class="plan-stage" id="plan-stage">
     <div class="plan-canvas-wrap" id="plan-wrap"><canvas id="plan-canvas"></canvas></div>
+    <div class="map-layer" id="map-layer"></div>
+    <div class="map-card" id="map-card" hidden></div>
+    <div class="map-fix" id="map-fix" hidden></div>
     <div class="plan-empty" id="plan-empty">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14"/><path d="M15 6v14"/></svg>
       <h3>No site plan attached</h3>
@@ -941,7 +999,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 79 · 22 Oct";
+const BUILD = "build 80 · 12 Nov";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -1043,6 +1101,7 @@ const PROGRAM_KEY = "siteProgress.programMeta.v1"; /* { uploadedAt, window, coun
 const RESTORE_FLAG = "siteProgress.restoredMissing.v1";
 const CALLOFF_KEY = "siteProgress.calloffs.v1";
 const PLOTINFO_KEY = "siteProgress.plotInfo.v1";
+const MAP_KEY = "siteProgress.mapPins.v1";        /* { plan, pins: { plotNo: [x, y] } } in plan page units */
 const SETTINGS_KEY = "siteProgress.settings.v1";   /* { trades: [], managers: [], noticeHours } */
 const DEFAULT_SETTINGS = {
   trades: ["Groundworker","Bricklayer","Scaffolder","Timber Frame","Roofer","Joiner","Electrician","Plumber",
@@ -1057,6 +1116,7 @@ let completed = loadJSON(COMPLETED_KEY, []);
 let programData = loadJSON(PROGRAM_KEY, null);
 let calloffs = loadJSON(CALLOFF_KEY, {});
 let plotInfo = loadJSON(PLOTINFO_KEY, null);
+let mapPins = loadJSON(MAP_KEY, {});
 let settings = Object.assign({}, DEFAULT_SETTINGS, loadJSON(SETTINGS_KEY, {}));
 let completedOpen = false, logsOpen = false, dueOpen = false, progOpen = false, calloffOpen = false, calloffShowDone = false;
 const calloffPlotsOpen = new Set();
@@ -1433,6 +1493,7 @@ function saveNow(){
     localStorage.setItem(CALLOFF_KEY, JSON.stringify(calloffs));
     if(plotInfo) localStorage.setItem(PLOTINFO_KEY, JSON.stringify(plotInfo)); else localStorage.removeItem(PLOTINFO_KEY);
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    localStorage.setItem(MAP_KEY, JSON.stringify(mapPins || {}));
     if(programData) localStorage.setItem(PROGRAM_KEY, JSON.stringify(programData));
     else localStorage.removeItem(PROGRAM_KEY);
   }catch(e){
@@ -2015,6 +2076,11 @@ function parseProgramPages(pages){
 
       const rec = plots[pn] = plots[pn] || { house: house, est: {}, act: {} };
       if(house && !rec.house) rec.house = house;
+      /* the three narrow columns before "Est.": release type / build limit, sales status, stage complete */
+      const colTok = (x0, x1, re) => { const t = rowItems.find(i => i.x >= x0 && i.x < x1 && re.test(i.str.trim())); return t ? t.str.trim() : ""; };
+      rec.rel  = colTok(100, 116.5, /^[TPM1-9]$/) || rec.rel || "";
+      rec.sale = colTok(116.5, 129.5, /^[FRELWP]$/) || rec.sale || "";
+      rec.sc   = colTok(129.5, 139, /^[1-9]$/) || rec.sc || "";
 
       /* grid digits: walk every character; multi-char runs are spread across the item width */
       const grab = (y0, dest) => {
@@ -2054,7 +2120,9 @@ function parseProgramPages(pages){
   return {
     plots: plots,
     window: allDates.length ? [allDates[0], allDates[allDates.length - 1]] : null,
-    counts: { total: nums.length, completed: completedN, notStarted: notStartedN }
+    counts: { total: nums.length, completed: completedN, notStarted: notStartedN,
+              rel: nums.filter(n => plots[n].rel).length,
+              sale: nums.reduce((o, n) => { const k = plots[n].sale; if(k) o[k] = (o[k] || 0) + 1; return o; }, {}) }
   };
 }
 
@@ -2191,11 +2259,15 @@ function applyProgram(parsed){
     const rec = parsed.plots[n];
     const name = "Plot " + n;
     progNames.add(name);
-    const prog = { house: rec.house || "", est: rec.est, current: rec.current, notStarted: !!rec.notStarted };
+    const prog = { house: rec.house || "", est: rec.est, current: rec.current, notStarted: !!rec.notStarted,
+                   rel: rec.rel || "", sale: rec.sale || "", sc: rec.sc || "" };
     const ex = existingByName[name];
     if(ex){
       /* dates only: a plot the app already has NEVER moves — the user moves
          plots themself; ahead/behind chips show any gap to the programme */
+      if(!parsed.counts.rel && ex.p.prog){             /* columns unreadable this week: keep last week's */
+        prog.rel = ex.p.prog.rel || ""; prog.sale = ex.p.prog.sale || ""; prog.sc = ex.p.prog.sc || "";
+      }
       ex.p.prog = prog;
       newPlots[ex.si].push(ex.p);
       return;
@@ -2239,6 +2311,9 @@ function bindProgram(){
       const c = parsed.counts, firstTime = !programData;
       const msg = "Programme parsed:\n• " + c.total + " plots (" + c.completed + " complete, " +
         c.notStarted + " not started)\n• Weeks " + fmtDay(parsed.window[0]) + " – " + fmtDay(parsed.window[1]) +
+        "\n• Sales: " + (["E", "R", "F", "L"].filter(k => c.sale[k]).map(k => c.sale[k] + " " + MAP_SALE[k][1].toLowerCase()).join(", ") || "none read") +
+        "\n• Build limit / release read for " + c.rel + " of " + c.total + " plots" +
+        (c.rel ? "" : "\n\n⚠ No build limits could be read — the report layout may have changed. The site map will keep last week's.") +
         (firstTime ? "\n\nThis will REPLACE the current plots in the app." :
                      "\n\nClaim dates will be updated — NO plots will be moved.") +
         "\n\nApply now?";
@@ -2941,6 +3016,7 @@ let popTaskId = null;
 
 function render(){
   syncCallOffs();
+  if(planEls.overlay && !planEls.overlay.hidden) mapRender();
   app.innerHTML = "";
   app.appendChild(renderProgSection());
   app.appendChild(renderTodoSection());
@@ -4528,6 +4604,7 @@ function planBind(){
   planEls.out.onclick = () => zoomPlan(1 / 1.4);
   planEls.fit.onclick = () => { planScale = planFitScale; centrePlan(); applyPlanTransform(); };
   attachPlanGestures();
+  mapBind();
 }
 
 /* ============================================================
@@ -5646,10 +5723,223 @@ function exportTodayPDF(){
   showToast("Today's check sheet exported");
 }
 
+/* ============================================================
+   Site map — markers on the site plan, one per plot, with a
+   "view by" switch: build stage, sales status, build limit (all
+   from the weekly build programme), late & today (BuildFlow),
+   Part L / fire photos. Plot positions are stored once, in plan
+   page units, and shared with every device.
+   ============================================================ */
+const MAP_VIEWS = [["off", "Off"], ["stage", "Build stage"], ["sales", "Sales status"], ["limit", "Build limit"], ["late", "Late & today"], ["partl", "Part L / Fire"]];
+const MAP_SEQ = ["#EEF1F5", "#D6E8F8", "#BBD9F3", "#9CC8EE", "#77B3E8", "#4F9DE2", "#2A88DB", "#0F74CB", "#0A5FA8", "#084B86"];
+const MAP_SALE = { F: ["#F2C230", "For sale"], R: ["#0984E3", "Reserved"], E: ["#D23C4E", "Exchanged"], L: ["#1E272E", "Legal"], W: ["#87929C", "Withdrawn"], P: ["#8E5BD6", "Pre-reserved"] };
+const MAP_STAGE_NAME = { 1: "Start founds", 2: "Starts supers", 3: "Finish supers", 4: "Finish roof", 5: "Finish 1st fix", 6: "Finish plaster", 7: "Finish sec finish", 8: "Finish paint", 9: "Completed" };
+let mapView = (() => { try{ return localStorage.getItem("siteProgress.mapView") || "off"; }catch(e){ return "off"; } })();
+let mapStageSrc = "prog";                         /* "prog" = build programme, "app" = Site Progress checklists */
+let mapSel = null, mapFix = false, mapFixPlot = null, mapK = 1;
+const mapEls = {};
+
+function mapPinsObj(){ if(!mapPins || typeof mapPins !== "object") mapPins = {}; if(!mapPins.pins) mapPins.pins = {}; return mapPins.pins; }
+function mapAllPlots(){
+  const set = new Set(), ok = n => n && /^\d+[A-Za-z]?$/.test(n);
+  if(plotInfo && plotInfo.order) plotInfo.order.forEach(n => set.add(String(n)));
+  state.forEach(s => { if(!s.basic && s.progNo) s.plots.forEach(p => { const n = plotNoOf(p.name); if(ok(n)) set.add(n); }); });
+  completed.forEach(c => { const n = plotNoOf(c.name); if(ok(n)) set.add(n); });
+  Object.keys(mapPinsObj()).forEach(n => set.add(n));
+  return [...set].sort(progPlotOrder);
+}
+/* everything the map knows about one plot */
+function mapInfo(no){
+  const name = "Plot " + no;
+  let s = null, p = null;
+  for(const st of state){ if(st.basic || !st.progNo) continue; const f = st.plots.find(x => x.name === name); if(f){ s = st; p = f; break; } }
+  const done = !p && completed.some(c => c.name === name);
+  const pr = p && p.prog;
+  const hasCols = !!(pr && ("sale" in pr || "rel" in pr || "sc" in pr));
+  const info = { no, name, stage: s, plot: p, done, known: !!(p || done), hasCols,
+    sale: pr && pr.sale || "", rel: pr && pr.rel || "", sc: pr && pr.sc ? +pr.sc : 0,
+    appStage: s ? s.progNo : (done ? 9 : 0), appStarted: s ? plotStarted(p, s) : done,
+    late: 0, today: [], partl: 0 };
+  if(p){ try{ info.late = plotProgLate(p); }catch(e){} }
+  const prog = bfP();
+  if(prog){ const t = todayStr(); prog.acts.forEach(a => { if(a.p === String(no) && a.st !== "complete" && a.s <= t && a.e >= t) info.today.push(a); }); }
+  state.forEach(st => st.plots.forEach(x => { if(x.name === name) x.tasks.forEach(tk => { if(!tk.done && /part l|fire photo/i.test(tk.name)) info.partl++; }); }));
+  return info;
+}
+function mapMarkerHTML(view, i){
+  const esc = dashEsc;
+  if(view === "num") return '<span class="mp-b num' + (String(mapFixPlot) === String(i.no) ? ' sel' : '') + '">' + esc(i.no) + '</span>';
+  if(i.done && view !== "partl") return '<span class="mp-b done">✓</span>';
+  if(view === "stage"){
+    const st = mapStageSrc === "app" ? (i.appStarted ? i.appStage : 0) : i.sc;
+    const dot = i.sale && MAP_SALE[i.sale] ? '<i class="mp-dot" style="background:' + MAP_SALE[i.sale][0] + '"></i>' : '';
+    return '<span class="mp-b' + (st >= 5 ? ' dk' : '') + '" style="background:' + MAP_SEQ[st] + '">' + (st || "–") + '</span>' + dot;
+  }
+  if(view === "sales"){
+    const sl = MAP_SALE[i.sale];
+    return sl ? '<span class="mp-b rnd' + (i.sale === "F" ? '' : ' dk') + '" style="background:' + sl[0] + '">' + i.sale + '</span>' : '<span class="mp-b rnd none"></span>';
+  }
+  if(view === "limit"){
+    if(!i.rel) return '<span class="mp-b rnd none"></span>';
+    const num = /^[1-9]$/.test(i.rel), at = num && i.sc >= +i.rel;
+    return '<span class="mp-b pill' + (at ? ' at dk' : num ? ' ok' : ' tend') + '">' + (num ? i.sc + "-" + i.rel : esc(i.rel)) + '</span>';
+  }
+  if(view === "late"){
+    if(i.late) return '<span class="mp-b rnd dk" style="background:#D23C4E">' + i.late + '</span>';
+    if(i.today.length) return '<span class="mp-b rnd dk" style="background:#0984E3">' + i.today.length + '</span>';
+    return '<span class="mp-b rnd none"></span>';
+  }
+  if(view === "partl"){
+    if(i.partl) return '<span class="mp-b rnd" style="background:#F2A93B">' + i.partl + '</span>';
+    return '<span class="mp-b rnd none' + (i.known ? ' good' : '') + '"></span>';
+  }
+  return "";
+}
+function mapLegendHTML(){
+  const dot = (c, t, sq) => '<span><i style="background:' + c + (sq ? ';border-radius:3px' : '') + '"></i>' + t + '</span>';
+  const pins = Object.keys(mapPinsObj()).length;
+  if(mapFix) return '<span>Pick a plot below, then tap the plan where it is. Tap a marker to pick that plot.</span>';
+  if(!pins) return '<span>No plot positions yet — tap <b>Fix positions</b> to place plots on the plan.</span>';
+  const up = programData && programData.uploadedAt ? ' · programme uploaded ' + fmtDate(programData.uploadedAt) : '';
+  const anyCols = state.some(s => s.plots.some(p => p.prog && ("sale" in p.prog || "rel" in p.prog)));
+  const need = '<span class="warn">Upload this week\'s build programme to load this.</span>';
+  if(mapView === "stage") return '<span class="mp-src"><button data-src="prog"' + (mapStageSrc === "prog" ? ' class="on"' : '') + '>Programme</button><button data-src="app"' + (mapStageSrc === "app" ? ' class="on"' : '') + '>My checklists</button></span>' +
+    dot(MAP_SEQ[1], "1", 1) + dot(MAP_SEQ[5], "5", 1) + dot(MAP_SEQ[9], "9", 1) + dot("#00A19D", "complete", 1) + '<span>corner dot = sales</span>' +
+    (mapStageSrc === "prog" && !anyCols ? need : '<span>' + (mapStageSrc === "prog" ? up.replace(" · ", "") : "live") + '</span>');
+  if(mapView === "sales") return !anyCols ? need : Object.keys(MAP_SALE).slice(0, 4).map(k => dot(MAP_SALE[k][0], k + " " + MAP_SALE[k][1])).join("") + dot("#C5CCD4", "not released") + '<span>' + up.replace(" · ", "") + '</span>';
+  if(mapView === "limit") return !anyCols ? need : dot("#F8DC5A", "stage-limit: room to build") + dot("#D23C4E", "at its build limit") + dot("#C5CCD4", "T / P: no limit yet") + '<span>' + up.replace(" · ", "") + '</span>';
+  if(mapView === "late") return !bfP() ? '<span class="warn">Needs the BuildFlow programme — sign in and sync.</span>' : dot("#D23C4E", "jobs late on programme") + dot("#0984E3", "trades on it today") + dot("#C5CCD4", "nothing today");
+  if(mapView === "partl") return dot("#F2A93B", "Part L / fire photos outstanding") + dot("#00A19D", "none outstanding");
+  return "";
+}
+
+function mapBind(){
+  ["bar", "chips", "legend", "layer", "card", "fix"].forEach(k => mapEls[k] = document.getElementById("map-" + k));
+  const stage = planEls.stage;
+  let down = null, active = 0;
+  stage.addEventListener("pointerdown", e => { active++; down = active === 1 ? { x: e.clientX, y: e.clientY, t: Date.now(), id: e.pointerId } : null; });
+  const up = e => {
+    active = Math.max(0, active - 1);
+    const d = down; down = null;
+    if(e.type !== "pointerup" || !d || d.id !== e.pointerId || (mapView === "off" && !mapFix) || !planDoc) return;
+    if(Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8 || Date.now() - d.t > 450) return;
+    const r = stage.getBoundingClientRect();
+    mapTap(e.clientX - r.left, e.clientY - r.top);
+  };
+  stage.addEventListener("pointerup", up);
+  stage.addEventListener("pointercancel", up);
+  /* the card and the fix bar sit on the plan: their taps must not pan the plan or count as taps on it */
+  [mapEls.card, mapEls.fix].forEach(el => ["pointerdown", "pointermove", "pointerup", "wheel"].forEach(t => el.addEventListener(t, e => e.stopPropagation())));
+  mapRender();
+}
+function mapTap(sx, sy){
+  const pins = mapPinsObj();
+  let best = null, bd = Math.max(16, 15 * mapK);
+  Object.keys(pins).forEach(n => {
+    const d = Math.hypot(planTx + pins[n][0] * planScale - sx, planTy + pins[n][1] * planScale - sy);
+    if(d < bd){ bd = d; best = n; }
+  });
+  if(mapFix){
+    if(best){ mapFixPlot = best; mapRender(); return; }
+    if(mapFixPlot == null){ showToast("Pick a plot first"); return; }
+    pins[mapFixPlot] = [Math.round((sx - planTx) / planScale * 10) / 10, Math.round((sy - planTy) / planScale * 10) / 10];
+    mapPins.plan = planEls.title.textContent || mapPins.plan || "";
+    saveNow();
+    const next = mapAllPlots().find(n => !pins[n]);      /* move on to the next plot still to place */
+    showToast("Plot " + mapFixPlot + " placed");
+    mapFixPlot = next != null ? next : mapFixPlot;
+    mapRender();
+    return;
+  }
+  mapSel = best; mapRender();
+}
+function mapSetView(v){
+  mapView = v; mapSel = null;
+  try{ localStorage.setItem("siteProgress.mapView", v); }catch(e){}
+  mapRender();
+}
+/* rebuild markers, chips, legend and the plot card */
+function mapRender(){
+  if(!mapEls.layer) return;
+  const show = !!planDoc && planPage === 1;
+  mapEls.bar.hidden = !show;
+  if(!show){ mapEls.layer.innerHTML = ""; mapEls.card.hidden = true; mapEls.fix.hidden = true; return; }
+  mapEls.chips.innerHTML = MAP_VIEWS.map(v => '<button data-v="' + v[0] + '"' + (!mapFix && mapView === v[0] ? ' class="on"' : '') + '>' + dashEsc(v[1]) + '</button>').join("") +
+    '<button data-v="__fix" class="fixb' + (mapFix ? ' on' : '') + '">' + (mapFix ? 'Done' : 'Fix positions') + '</button>';
+  mapEls.chips.querySelectorAll("button").forEach(b => b.onclick = () => {
+    if(b.dataset.v === "__fix"){ mapFix = !mapFix; mapSel = null; if(mapFix){ const pins = mapPinsObj(); mapFixPlot = mapAllPlots().find(n => !pins[n]) || null; } mapRender(); return; }
+    mapFix = false; mapSetView(b.dataset.v);
+  });
+  const view = mapFix ? "num" : mapView;
+  mapEls.legend.innerHTML = view === "off" ? "" : mapLegendHTML();
+  mapEls.legend.hidden = view === "off";
+  mapEls.legend.querySelectorAll("[data-src]").forEach(b => b.onclick = () => { mapStageSrc = b.dataset.src; mapRender(); });
+  const pins = mapPinsObj();
+  let h = "";
+  if(view !== "off") Object.keys(pins).forEach(n => {
+    h += '<div class="mp' + (String(mapSel) === n ? ' sel' : '') + '" data-no="' + dashEsc(n) + '">' + mapMarkerHTML(view, mapInfo(n)) + '</div>';
+  });
+  mapEls.layer.innerHTML = h;
+  mapPlace();
+  /* plot card */
+  if(mapSel != null && !mapFix && view !== "off"){
+    const i = mapInfo(mapSel), ht = houseType(i.name);
+    const sl = MAP_SALE[i.sale];
+    const cell = (k, v) => '<div><span>' + k + '</span><b>' + v + '</b></div>';
+    let rows = "";
+    if(i.done) rows += cell("Status", "Complete");
+    else {
+      rows += cell("Programme stage", i.hasCols ? (i.sc ? i.sc + " · " + MAP_STAGE_NAME[i.sc] : "Not started") : "—");
+      rows += cell("My checklist", i.stage ? "S" + i.appStage + " · " + dashEsc(i.stage.name) + (i.appStarted ? "" : " (not started)") : "—");
+      rows += cell("Sales status", sl ? sl[1] : (i.hasCols ? "Not released" : "—"));
+      rows += cell("Build limit", i.rel ? (/^[1-9]$/.test(i.rel) ? i.rel + " · " + MAP_STAGE_NAME[i.rel] + (i.sc >= +i.rel ? " — at limit" : "") : i.rel === "T" ? "Released for tender" : i.rel === "P" ? "Not released for tender" : dashEsc(i.rel)) : "—");
+      if(i.today.length) rows += cell("On today", dashEsc(i.today.map(a => a.l || a.t).join(", ")));
+      if(i.late) rows += cell("Late on programme", i.late + (i.late === 1 ? " job" : " jobs"));
+      if(i.partl) rows += cell("Part L / fire photos", i.partl + " outstanding");
+    }
+    mapEls.card.innerHTML = '<button class="mc-x" aria-label="Close">✕</button><div class="mc-h"><b>' + dashEsc(i.name) + '</b>' + (ht ? '<span class="ht-chip">' + dashEsc(ht) + '</span>' : '') + '</div>' +
+      '<div class="mc-rows">' + rows + '</div>' + (i.plot ? '<button class="mc-open">Open checklist</button>' : '');
+    mapEls.card.hidden = false;
+    mapEls.card.querySelector(".mc-x").onclick = () => { mapSel = null; mapRender(); };
+    const ob = mapEls.card.querySelector(".mc-open");
+    if(ob) ob.onclick = () => { closePlan(); jumpToPlot(i.name); };
+  } else mapEls.card.hidden = true;
+  /* fix-positions bar */
+  if(mapFix){
+    const all = mapAllPlots(), todo = all.filter(n => !pins[n]);
+    mapEls.fix.innerHTML = '<div class="mf-t">' + (todo.length ? todo.length + (todo.length === 1 ? ' plot' : ' plots') + ' still to place' : 'All ' + all.length + ' plots placed') + '</div>' +
+      '<div class="mf-r"><select id="map-fix-sel">' + todo.concat(all.filter(n => pins[n])).map(n => '<option value="' + dashEsc(n) + '"' + (String(mapFixPlot) === n ? ' selected' : '') + '>Plot ' + dashEsc(n) + (pins[n] ? '' : ' — not placed') + '</option>').join("") + '</select>' +
+      '<button id="map-fix-rm"' + (mapFixPlot != null && pins[mapFixPlot] ? '' : ' disabled') + '>Remove pin</button><button id="map-fix-done" class="pri">Done</button></div>';
+    mapEls.fix.hidden = false;
+    const sel = document.getElementById("map-fix-sel");
+    sel.onchange = () => {
+      mapFixPlot = sel.value;
+      const p = pins[mapFixPlot];
+      if(p){ planTx = planEls.stage.clientWidth / 2 - p[0] * planScale; planTy = planEls.stage.clientHeight / 2 - p[1] * planScale; applyPlanTransform(); scheduleRerender(); }
+      mapRender();
+    };
+    document.getElementById("map-fix-rm").onclick = () => { delete pins[mapFixPlot]; saveNow(); mapRender(); };
+    document.getElementById("map-fix-done").onclick = () => { mapFix = false; mapRender(); };
+  } else mapEls.fix.hidden = true;
+}
+/* keep markers on their plots as the plan is panned and zoomed; shrink to dots when zoomed out */
+function mapPlace(){
+  if(!mapEls.layer || !planBase) return;
+  const pins = mapPinsObj();
+  mapK = Math.max(0.2, Math.min(1.25, planScale * 1.28));
+  mapEls.layer.classList.toggle("tiny", mapK < 0.5);
+  const kids = mapEls.layer.children;
+  for(let n = 0; n < kids.length; n++){
+    const el = kids[n], p = pins[el.dataset.no];
+    if(!p) continue;
+    el.style.transform = "translate(" + (planTx + p[0] * planScale) + "px," + (planTy + p[1] * planScale) + "px) translate(-50%,-50%) scale(" + mapK + ")";
+  }
+}
+
 function openPlan(){
   planEls.overlay.hidden = false;
   document.body.style.overflow = "hidden";
-  if(!planDoc) loadPlanFromStore();
+  if(!planDoc) loadPlanFromStore(); else mapRender();
 }
 function closePlan(){
   planEls.overlay.hidden = true;
@@ -5704,6 +5994,7 @@ function showPlanEmpty(){
   planEls.pages.hidden = true;
   planEls.title.textContent = "Site plan";
   planEls.canvas.width = planEls.canvas.height = 0;
+  mapRender();
 }
 
 function renderPlanFrom(buf, name){
@@ -5743,6 +6034,7 @@ function drawPlanPage(){
     planFitScale = Math.min(sw / planBase.width, sh / planBase.height);
     planScale = planFitScale;
     centrePlan();
+    mapRender();
     return rerenderPlan();
   });
 }
@@ -5760,6 +6052,7 @@ function applyPlanTransform(){
   const x = planTx - (rTx + rMx) * k;
   const y = planTy - (rTy + rMy) * k;
   planEls.wrap.style.transform = "translate(" + x + "px," + y + "px) scale(" + k + ")";
+  mapPlace();
 }
 
 function scheduleRerender(){
@@ -5925,7 +6218,7 @@ window.addEventListener("pagehide", saveNow);
    ============================================================ */
 function backupData(){
   return { kind: "site-progress-backup", version: 2, at: Date.now(),
-           state: state, timeline: timeline, completed: completed, programData: programData, calloffs: calloffs, plotInfo: plotInfo, settings: settings };
+           state: state, timeline: timeline, completed: completed, programData: programData, calloffs: calloffs, plotInfo: plotInfo, settings: settings, mapPins: mapPins };
 }
 function exportBackup(){
   saveNow();
@@ -5962,6 +6255,7 @@ function applyBackup(d){
   programData = d.programData || null;
   calloffs = d.calloffs || {};
   if(d.plotInfo) plotInfo = d.plotInfo;
+  if(d.mapPins) mapPins = d.mapPins;
   if(d.settings) settings = Object.assign({}, DEFAULT_SETTINGS, d.settings);
   saveNow(); render();
   if(syncReady) syncForceUpload().then(() => showToast("Backup restored and shared with the team"));
@@ -6036,7 +6330,7 @@ checkForUpdate();
    ============================================================ */
 const SB_URL = "https://exgtwsorllyzhohefowu.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV4Z3R3c29ybGx5emhvaGVmb3d1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIyODY0NjcsImV4cCI6MjEwNzg2MjQ2N30.ocVjQxWe4a9OUOhHecBHZbBKzRkhRdp5PZp-0prynnM";
-const SYNC_KEYS = ["state", "timeline", "completed", "calloffs", "programData", "plotInfo", "settings"];
+const SYNC_KEYS = ["state", "timeline", "completed", "calloffs", "programData", "plotInfo", "settings", "mapPins"];
 const SYNC_META_KEY = "siteProgress.sync.v1";      /* { base: { key: { version, value } } } */
 
 var sb = null, me = null, syncReady = false, syncBusy = false, syncTimer = null, syncChannel = null;   /* var: saveNow may run before this line */
@@ -6066,6 +6360,7 @@ function getLocal(key){
   if(key === "programData") return programData || {};
   if(key === "plotInfo") return plotInfo || {};
   if(key === "settings") return settings;
+  if(key === "mapPins") return mapPins || {};
 }
 function setLocal(key, value){
   if(key === "state"){
@@ -6080,6 +6375,7 @@ function setLocal(key, value){
   else if(key === "programData") programData = (value && Object.keys(value).length) ? clone(value) : null;
   else if(key === "settings") settings = Object.assign({}, DEFAULT_SETTINGS, clone(value) || {});
   else if(key === "plotInfo"){ plotInfo = (value && value.headers) ? clone(value) : null; piLegendCache = null; }
+  else if(key === "mapPins") mapPins = clone(value) || {};
 }
 /* Merge one document. For the site state, a plot moved on one device while being edited on another
    can end up in two flow stages; only copies the merge itself created are dropped (furthest stage kept). */
