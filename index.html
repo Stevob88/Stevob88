@@ -999,7 +999,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 80 · 12 Nov";
+const BUILD = "build 81 · 12 Nov";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -5753,7 +5753,8 @@ function mapInfo(no){
   const name = "Plot " + no;
   let s = null, p = null;
   for(const st of state){ if(st.basic || !st.progNo) continue; const f = st.plots.find(x => x.name === name); if(f){ s = st; p = f; break; } }
-  const done = !p && completed.some(c => c.name === name);
+  /* not in any build stage = finished: either moved to Completed Plots or already off the programme */
+  const done = !p;
   const pr = p && p.prog;
   const hasCols = !!(pr && ("sale" in pr || "rel" in pr || "sc" in pr));
   const info = { no, name, stage: s, plot: p, done, known: !!(p || done), hasCols,
