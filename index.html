@@ -1001,7 +1001,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 86 · 13 Nov";
+const BUILD = "build 87 · 13 Nov";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -4604,7 +4604,7 @@ function planBind(){
   planEls.next.onclick = () => gotoPlanPage(planPage + 1);
   planEls.in.onclick  = () => zoomPlan(1.4);
   planEls.out.onclick = () => zoomPlan(1 / 1.4);
-  planEls.fit.onclick = () => { planScale = planFitScale; centrePlan(); applyPlanTransform(); };
+  planEls.fit.onclick = () => { planScale = planFitScale; centrePlan(); fitPlanToPlots(); applyPlanTransform(); scheduleRerender(); };
   attachPlanGestures();
   mapBind();
 }
@@ -6170,16 +6170,30 @@ function drawPlanPage(){
   return planDoc.getPage(planPage).then(page => {
     planPageObj = page;
     planBase = page.getViewport({ scale: 1 });
+    mapRender();                                  /* show the View by bar first, so the plan fits the space left */
     const sw = planEls.stage.clientWidth || 360;
     const sh = planEls.stage.clientHeight || 600;
     planFitScale = Math.min(sw / planBase.width, sh / planBase.height);
     planScale = planFitScale;
     centrePlan();
-    mapRender();
+    fitPlanToPlots();
+    mapPlace();
     return rerenderPlan();
   });
 }
 
+/* open (and Fit) on the area with plots rather than the whole drawing sheet */
+function fitPlanToPlots(){
+  if(planPage !== 1) return;
+  const pv = Object.values(mapPinsObj());
+  if(pv.length < 2) return;
+  const pad = 60, sw = planEls.stage.clientWidth || 360, sh = planEls.stage.clientHeight || 600;
+  const x0 = Math.min(...pv.map(q => q[0])) - pad, x1 = Math.max(...pv.map(q => q[0])) + pad;
+  const y0 = Math.min(...pv.map(q => q[1])) - pad, y1 = Math.max(...pv.map(q => q[1])) + pad;
+  planScale = Math.max(planFitScale, Math.min(sw / (x1 - x0), sh / (y1 - y0)));
+  planTx = sw / 2 - (x0 + x1) / 2 * planScale;
+  planTy = sh / 2 - (y0 + y1) / 2 * planScale;
+}
 function centrePlan(){
   planTx = (planEls.stage.clientWidth  - planBase.width  * planScale) / 2;
   planTy = (planEls.stage.clientHeight - planBase.height * planScale) / 2;
