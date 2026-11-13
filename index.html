@@ -1022,7 +1022,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 88 · 13 Nov";
+const BUILD = "build 89 · 13 Nov";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -5824,8 +5824,10 @@ function mapMarkerHTML(view, i){
   }
   if(view === "limit"){
     if(!i.rel) return '<span class="mp-b rnd none"></span>';
-    const num = /^[1-9]$/.test(i.rel), at = num && i.sc >= +i.rel;
-    return '<span class="mp-b pill' + (at ? ' at dk' : num ? ' ok' : ' tend') + '">' + (num ? i.sc + "-" + i.rel : esc(i.rel)) + '</span>';
+    /* live stage from Site Progress, build limit from the programme */
+    const live = i.appStarted ? i.appStage : 0;
+    const num = /^[1-9]$/.test(i.rel), at = num && live >= +i.rel;
+    return '<span class="mp-b pill' + (at ? ' at dk' : num ? ' ok' : ' tend') + '">' + (num ? live + "-" + i.rel : esc(i.rel)) + '</span>';
   }
   if(view === "late"){
     if(i.late) return '<span class="mp-b rnd dk" style="background:#D23C4E">' + i.late + '</span>';
@@ -5858,7 +5860,7 @@ function mapLegendHTML(){
     dot(MAP_SEQ[1], "1", 1) + dot(MAP_SEQ[5], "5", 1) + dot(MAP_SEQ[9], "9", 1) + dot("#00A19D", "complete", 1) + '<span>corner dot = sales</span>' +
     (mapStageSrc === "prog" && !anyCols ? need : '<span>' + (mapStageSrc === "prog" ? up.replace(" · ", "") : "live") + '</span>');
   if(mapView === "sales") return !anyCols ? need : Object.keys(MAP_SALE).slice(0, 4).map(k => dot(MAP_SALE[k][0], k + " " + MAP_SALE[k][1])).join("") + dot("#C5CCD4", "not released") + '<span>' + up.replace(" · ", "") + '</span>';
-  if(mapView === "limit") return !anyCols ? need : dot("#F8DC5A", "stage-limit: room to build") + dot("#D23C4E", "at its build limit") + dot("#C5CCD4", "T / P: no limit yet") + '<span>' + up.replace(" · ", "") + '</span>';
+  if(mapView === "limit") return !anyCols ? need : dot("#F8DC5A", "live stage - limit: room to build") + dot("#D23C4E", "at its build limit") + dot("#C5CCD4", "T / P: no limit yet") + '<span>' + up.replace(" · ", "") + '</span>';
   if(mapView === "late") return !bfP() ? '<span class="warn">Needs the BuildFlow programme — sign in and sync.</span>' : dot("#D23C4E", "jobs late on programme") + dot("#0984E3", "trades on it today") + dot("#C5CCD4", "nothing today");
   if(mapView === "claim") return !programData ? need : dot("#00A19D", "2+ weeks to claim", 1) + dot("#F2A93B", "claim this week or next", 1) + dot("#D23C4E", "claim date passed (−weeks)", 1) + dot("#C5CCD4", "not started yet") + '<span>number = weeks left to claim the stage the plot is in</span>';
   if(mapView === "partl") return dot("#F2A93B", "Part L / fire photos outstanding") + dot("#00A19D", "none outstanding");
@@ -6054,7 +6056,7 @@ function mapRender(){
       rows += cell("Sales status", sl ? sl[1] : (i.hasCols ? "Not released" : "—"));
       if(i.claimDue){ const ci = claimInfo(i.claimDue), w = mapClaimWeeks(i.claimDue);
         rows += cell("Claim S" + i.appStage, (w < 0 ? -w + (w === -1 ? " week" : " weeks") + " over" : w + (w === 1 ? " week" : " weeks") + " left") + " · " + fmtDay(ci.claim)); }
-      rows += cell("Build limit", i.rel ? (/^[1-9]$/.test(i.rel) ? i.rel + " · " + MAP_STAGE_NAME[i.rel] + (i.sc >= +i.rel ? " — at limit" : "") : i.rel === "T" ? "Released for tender" : i.rel === "P" ? "Not released for tender" : dashEsc(i.rel)) : "—");
+      rows += cell("Build limit", i.rel ? (/^[1-9]$/.test(i.rel) ? i.rel + " · " + MAP_STAGE_NAME[i.rel] + ((i.appStarted ? i.appStage : 0) >= +i.rel ? " — at limit" : "") : i.rel === "T" ? "Released for tender" : i.rel === "P" ? "Not released for tender" : dashEsc(i.rel)) : "—");
       if(i.today.length) rows += cell("On today", dashEsc(i.today.map(a => a.l || a.t).join(", ")));
       if(i.late) rows += cell("Late on programme", i.late + (i.late === 1 ? " job" : " jobs"));
       if(i.partl) rows += cell("Part L / fire photos", i.partl + " outstanding");
