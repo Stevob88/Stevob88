@@ -496,6 +496,7 @@
   .map-chips button.on{background:var(--grad);color:#fff;box-shadow:0 6px 14px rgba(9,132,227,.28);}
   .map-chips button.fixb{background:#fff;border:1.5px dashed #9CCBF2;color:var(--blue);padding:5.5px 12px;}
   .map-chips button.fixb.on{border-style:solid;border-color:transparent;}
+  .map-chips button.pdfb{border-style:solid;border-color:var(--blue);}
   .map-legend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-size:11.5px;font-weight:600;color:var(--ink-soft);margin-top:7px;}
   .map-legend[hidden]{display:none;}
   .map-legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:4px;vertical-align:-1.5px;}
@@ -1000,7 +1001,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 84 · 13 Nov";
+const BUILD = "build 85 · 13 Nov";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -5842,6 +5843,112 @@ function mapLegendHTML(){
   return "";
 }
 
+/* ---- export the current map view as an A3 PDF: the plan with every plot's marker, title and key ---- */
+async function mapExportPDF(){
+  const lib = window.jspdf || {};
+  if(!lib.jsPDF){ showToast("PDF library not loaded — check connection"); return; }
+  if(!planDoc || mapView === "off") return;
+  const view = mapView, viewName = (MAP_VIEWS.find(v => v[0] === view) || [, ""])[1];
+  showToast("Making the " + viewName + " PDF…");
+  try{
+    /* 1. the plan drawing, page 1, at print resolution (kept under ~9 million pixels for phones) */
+    /* only the part of the plan with plots on it, so the markers print large */
+    const page = await planDoc.getPage(1);
+    const base = page.getViewport({ scale: 1 });
+    const pins = mapPinsObj(), pv = Object.values(pins);
+    const pad = 70;
+    let x0 = 0, y0 = 0, x1 = base.width, y1 = base.height;
+    if(pv.length){
+      x0 = Math.max(0, Math.min(...pv.map(q => q[0])) - pad); x1 = Math.min(base.width, Math.max(...pv.map(q => q[0])) + pad);
+      y0 = Math.max(0, Math.min(...pv.map(q => q[1])) - pad); y1 = Math.min(base.height, Math.max(...pv.map(q => q[1])) + pad);
+    }
+    const S = Math.min(3, Math.sqrt(9e6 / ((x1 - x0) * (y1 - y0))));
+    const cv = document.createElement("canvas");
+    cv.width = Math.round((x1 - x0) * S); cv.height = Math.round((y1 - y0) * S);
+    const ctx = cv.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
+    await page.render({ canvasContext: ctx, viewport: page.getViewport({ scale: S }), transform: [1, 0, 0, 1, -x0 * S, -y0 * S] }).promise;
+
+    /* 2. markers: build each one with the map's own styles, measure it, and paint it on */
+    const box = document.createElement("div");
+    box.className = "map-layer";
+    box.style.cssText = "position:fixed;left:-9999px;top:0;width:200px;height:200px;visibility:hidden;";
+    document.body.appendChild(box);
+    const K = S * 1.15;
+    const rr = (x, y, w, h, r) => { r = Math.min(r, w / 2, h / 2); ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
+    Object.keys(pins).forEach(n => {
+      box.innerHTML = '<div class="mp">' + mapMarkerHTML(view, mapInfo(n)) + '</div>';
+      const b = box.querySelector(".mp-b"); if(!b) return;
+      const cs = getComputedStyle(b), w = b.offsetWidth * K, h = b.offsetHeight * K;
+      const cx = (pins[n][0] - x0) * S, cy = (pins[n][1] - y0) * S;
+      const rad = Math.min(parseFloat(cs.borderTopLeftRadius) || 0, b.offsetWidth) * K;
+      ctx.save();
+      ctx.shadowColor = "rgba(30,39,46,.35)"; ctx.shadowBlur = 4 * K; ctx.shadowOffsetY = 1.5 * K;
+      rr(cx - w / 2, cy - h / 2, w, h, rad); ctx.fillStyle = "#fff"; ctx.fill();
+      ctx.restore();
+      const bw = (parseFloat(cs.borderTopWidth) || 2) * K;
+      rr(cx - w / 2 + bw, cy - h / 2 + bw, w - 2 * bw, h - 2 * bw, Math.max(0, rad - bw)); ctx.fillStyle = cs.backgroundColor; ctx.fill();
+      const t = b.textContent.trim();
+      if(t){
+        ctx.fillStyle = cs.color; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.font = "800 " + (parseFloat(cs.fontSize) * K) + "px " + cs.fontFamily;
+        ctx.fillText(t, cx, cy + 0.5 * K);
+      }
+      const d = box.querySelector(".mp-dot");
+      if(d){
+        const dcs = getComputedStyle(d), r = d.offsetWidth / 2 * K, dx = cx + w / 2 - 1 * K, dy = cy - h / 2 + 1 * K;
+        ctx.beginPath(); ctx.arc(dx, dy, r, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill();
+        ctx.beginPath(); ctx.arc(dx, dy, r - 1.5 * K, 0, Math.PI * 2); ctx.fillStyle = dcs.backgroundColor; ctx.fill();
+      }
+    });
+
+    /* 3. the key, read from the on-screen legend */
+    box.innerHTML = '<div>' + mapLegendHTML() + '</div>';
+    const keys = [...box.firstChild.children].filter(el => !el.classList.contains("mp-src")).map(el => {
+      const i = el.querySelector("i");
+      return { colour: i ? getComputedStyle(i).backgroundColor : null, text: el.textContent.trim().replace(/[\u2212\u2013\u2014]/g, "-").replace(/[^\x20-\xFF]/g, "") };
+    }).filter(k => k.text);
+    box.remove();
+
+    /* 4. A3 landscape page */
+    const doc = new lib.jsPDF({ unit: "pt", format: "a3", orientation: "landscape" });
+    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 28;
+    const site = (bfP() && bfP().site && bfP().site.name) || (plotInfo && plotInfo.site) || "Site";
+    const now = new Date();
+    doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(30, 39, 46);
+    doc.text("Site map — " + viewName + (view === "stage" ? (mapStageSrc === "app" ? " (my checklists)" : " (programme)") : ""), M, M + 14);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(94, 106, 117);
+    doc.text(site + "  ·  " + now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" }), M, M + 31);
+    /* key along the top right, wrapping */
+    const rgb = c => { const m = String(c || "").match(/\d+(\.\d+)?/g); return m ? m.slice(0, 3).map(Number) : [197, 204, 212]; };
+    doc.setFontSize(9.5);
+    let kx = W - M, ky = M + 10;
+    const rows = [[]]; let rw = 0; const maxW = W * 0.55;
+    keys.forEach(k => { const w = doc.getTextWidth(k.text) + (k.colour ? 14 : 0) + 14; if(rw + w > maxW && rows[rows.length - 1].length){ rows.push([]); rw = 0; } rows[rows.length - 1].push({ k, w }); rw += w; });
+    rows.forEach((row, ri) => {
+      let x = W - M - row.reduce((a, r) => a + r.w, 0) + 14, y = ky + ri * 15;
+      row.forEach(({ k, w }) => {
+        if(k.colour){ const c = rgb(k.colour); doc.setFillColor(c[0], c[1], c[2]); doc.roundedRect(x, y - 7.5, 9, 9, 2, 2, "F"); x += 13; }
+        doc.setTextColor(60, 70, 80); doc.text(k.text, x, y); x += w - (k.colour ? 13 : 0);
+      });
+    });
+    const top = M + 42 + Math.max(0, rows.length - 2) * 15;
+    doc.setDrawColor(9, 132, 227); doc.setLineWidth(1.2); doc.line(M, top - 6, W - M, top - 6);
+    const aw = W - 2 * M, ah = H - top - M - 12;
+    const sc = Math.min(aw / cv.width, ah / cv.height);
+    const iw = cv.width * sc, ih = cv.height * sc;
+    doc.addImage(cv.toDataURL("image/jpeg", 0.88), "JPEG", M + (aw - iw) / 2, top, iw, ih);
+    doc.setFontSize(8.5); doc.setTextColor(94, 106, 117);
+    doc.text("Site Progress  ·  " + (programData && programData.uploadedAt ? "build programme uploaded " + fmtDate(programData.uploadedAt) : "no build programme uploaded"), M, H - M + 6);
+    const fd = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
+    doc.save("Site-map-" + viewName.replace(/[^A-Za-z0-9]+/g, "-").replace(/-+$/, "") + "-" + fd + ".pdf");
+    showToast(viewName + " PDF exported");
+  }catch(err){
+    console.warn(err);
+    showToast("Couldn't make the PDF — try again");
+  }
+}
+
 function mapBind(){
   ["bar", "chips", "legend", "layer", "card", "fix"].forEach(k => mapEls[k] = document.getElementById("map-" + k));
   const stage = planEls.stage;
@@ -5894,8 +6001,10 @@ function mapRender(){
   mapEls.bar.hidden = !show;
   if(!show){ mapEls.layer.innerHTML = ""; mapEls.card.hidden = true; mapEls.fix.hidden = true; return; }
   mapEls.chips.innerHTML = MAP_VIEWS.map(v => '<button data-v="' + v[0] + '"' + (!mapFix && mapView === v[0] ? ' class="on"' : '') + '>' + dashEsc(v[1]) + '</button>').join("") +
+    (!mapFix && mapView !== "off" ? '<button data-v="__pdf" class="fixb pdfb">⬇ PDF</button>' : '') +
     '<button data-v="__fix" class="fixb' + (mapFix ? ' on' : '') + '">' + (mapFix ? 'Done' : 'Fix positions') + '</button>';
   mapEls.chips.querySelectorAll("button").forEach(b => b.onclick = () => {
+    if(b.dataset.v === "__pdf"){ mapExportPDF(); return; }
     if(b.dataset.v === "__fix"){ mapFix = !mapFix; mapSel = null; if(mapFix){ const pins = mapPinsObj(); mapFixPlot = mapAllPlots().find(n => !pins[n]) || null; } mapRender(); return; }
     mapFix = false; mapSetView(b.dataset.v);
   });
