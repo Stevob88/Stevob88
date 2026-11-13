@@ -1001,7 +1001,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 85 · 13 Nov";
+const BUILD = "build 86 · 13 Nov";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -5813,7 +5813,8 @@ function mapMarkerHTML(view, i){
   }
   if(view === "claim"){
     /* weeks left to claim the stage the plot is in (claim = Friday before the programme week) */
-    if(!i.claimDue) return '<span class="mp-b rnd none"></span>';
+    /* only plots actually in build: not started in Foundations yet = no number */
+    if(!i.claimDue || !i.appStarted) return '<span class="mp-b rnd none"></span>';
     const w = mapClaimWeeks(i.claimDue);
     const bg = w < 0 ? "#D23C4E" : w <= 1 ? "#F2A93B" : "#00A19D";
     return '<span class="mp-b' + (w < 0 || w > 1 ? ' dk' : '') + '" style="background:' + bg + '">' + w + '</span>';
@@ -5838,7 +5839,7 @@ function mapLegendHTML(){
   if(mapView === "sales") return !anyCols ? need : Object.keys(MAP_SALE).slice(0, 4).map(k => dot(MAP_SALE[k][0], k + " " + MAP_SALE[k][1])).join("") + dot("#C5CCD4", "not released") + '<span>' + up.replace(" · ", "") + '</span>';
   if(mapView === "limit") return !anyCols ? need : dot("#F8DC5A", "stage-limit: room to build") + dot("#D23C4E", "at its build limit") + dot("#C5CCD4", "T / P: no limit yet") + '<span>' + up.replace(" · ", "") + '</span>';
   if(mapView === "late") return !bfP() ? '<span class="warn">Needs the BuildFlow programme — sign in and sync.</span>' : dot("#D23C4E", "jobs late on programme") + dot("#0984E3", "trades on it today") + dot("#C5CCD4", "nothing today");
-  if(mapView === "claim") return !programData ? need : dot("#00A19D", "2+ weeks to claim", 1) + dot("#F2A93B", "claim this week or next", 1) + dot("#D23C4E", "claim date passed (−weeks)", 1) + '<span>number = weeks left to claim the stage the plot is in</span>';
+  if(mapView === "claim") return !programData ? need : dot("#00A19D", "2+ weeks to claim", 1) + dot("#F2A93B", "claim this week or next", 1) + dot("#D23C4E", "claim date passed (−weeks)", 1) + dot("#C5CCD4", "not started yet") + '<span>number = weeks left to claim the stage the plot is in</span>';
   if(mapView === "partl") return dot("#F2A93B", "Part L / fire photos outstanding") + dot("#00A19D", "none outstanding");
   return "";
 }
