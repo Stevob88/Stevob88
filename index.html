@@ -1000,7 +1000,7 @@
 "use strict";
 
 /* Build tag — shown at the bottom of the app so you can confirm you're on the latest version */
-const BUILD = "build 83 · 13 Nov";
+const BUILD = "build 84 · 13 Nov";
 
 /* ============================================================
    Icons (inline SVG strings)
@@ -3477,7 +3477,7 @@ function renderPlot(stage, plot){
     const now = ct ? ct.name : "";
     wr.innerHTML = '<span class="pw-stage" title="' + dashEsc(stage.name) + '">S' + stage.progNo + '</span>' +
       weeksTrackHTML(wk, scale) +
-      '<span class="pw-side"><span class="dash-val' + (wk.over ? ' bad' : wk.early ? ' early' : '') + '">' + weeksLabel(wk) + '</span>' +
+      '<span class="pw-side"><span class="dash-val' + (wk.over ? ' bad' : wk.soon ? ' soon' : wk.early ? ' early' : '') + '">' + weeksLabel(wk) + '</span>' +
       (now ? '<span class="pw-now' + (nextTask ? '' : ' done') + '">' + dashEsc(now) + '</span>' : '') + '</span>';
     head.appendChild(wr);
   }
@@ -4639,29 +4639,32 @@ function stageEntry(plot, stage, win){
   return win ? win.start : null;
 }
 
-/* Weeks in stage for a plot: { planned (programme weeks or null), el (weeks in so far or null), over } */
+/* Countdown to claiming the stage the plot is in. The bar runs from when the plot came into the
+   stage (or the programme's planned start, if that is earlier) to the stage's claim date:
+   { planned: weeks in that span, el: weeks gone, left: weeks to claim, over: claim date passed } */
 function stageWeeks(plot, stage){
   if(!stage || stage.basic || !stage.progNo) return null;
   const win = plannedStageWindow(plot, stage);
   const ent = stageEntry(plot, stage, win);
-  const el = ent ? Math.max(0, (Date.now() - ent) / MS_WEEK) : null;
-  const planned = win ? win.weeks : null;
-  /* only overrunning once the programme's claim date for this stage has gone by; a plot that came
-     into the stage before the programme said it would can use more weeks and still be on time */
   const due = plot.prog && plot.prog.est && plot.prog.est[String(stage.progNo)];
-  const late = due ? claimInfo(due).days < 0 : false;
-  const over = planned != null && el != null && el > planned && late;
-  const early = planned != null && el != null && el > planned && !late;
-  return { planned, el, over, early, claimDays: due ? claimInfo(due).days : null };
+  if(!due){
+    const el = ent ? Math.max(0, (Date.now() - ent) / MS_WEEK) : null;
+    return { planned: null, el, over: false, left: null };
+  }
+  const claimAt = new Date(claimInfo(due).claim + "T23:59:59").getTime();
+  const start = Math.min(ent || win.start, win.start);
+  const planned = Math.max(1, Math.round((claimAt - start) / MS_WEEK));
+  const el = Math.max(0, (Date.now() - start) / MS_WEEK);
+  const days = claimInfo(due).days;
+  return { planned, el, over: days < 0, soon: days >= 0 && days < 7, left: days, early: !!ent && ent < win.start - MS_WEEK };
 }
 function weeksLabel(w){
   if(!w || w.el == null) return "—";
-  const n = Math.floor(w.el);                     /* whole weeks completed */
-  if(w.early){                                    /* started the stage early: show time left to claim instead */
-    const k = Math.floor(w.claimDays / 7);
-    return n + " wks · claim " + (k < 1 ? "this wk" : "in " + k + (k === 1 ? " wk" : " wks"));
-  }
-  return n + (w.planned != null ? " of " + w.planned + " wks" : (n === 1 ? " wk" : " wks"));
+  if(w.left == null){ const n = Math.floor(w.el); return n + (n === 1 ? " wk" : " wks"); }
+  if(w.over){ const k = Math.ceil(-w.left / 7); return k + (k === 1 ? " wk" : " wks") + " over claim"; }
+  if(w.soon) return w.left === 0 ? "claim today" : "claim this wk";
+  const k = Math.floor(w.left / 7);
+  return k + (k === 1 ? " wk" : " wks") + " to claim";
 }
 /* light bar = programme weeks, dark = weeks in so far, red = past programme, white ticks between weeks */
 function weeksTrackHTML(w, scale){
@@ -4856,10 +4859,10 @@ function renderDashboard(){
   /* 4. weeks in stage, per plot */
   const rows = allPlots.map(({ p, st }) => Object.assign({ p, st }, stageWeeks(p, st)));
   const scale = Math.min(16, Math.max(1, ...rows.map(r => Math.max(r.planned || 0, Math.ceil(r.el || 0)))));
-  h += '<div class="dash-card"><h3>Plot <em>||</em> Weeks in stage</h3>' +
-       '<div class="dash-sub">Light bar = weeks the programme gives the stage · dark = weeks the plot has been in it</div>' +
-       '<div class="dash-legend"><span><i style="background:#D6E8F8"></i>Programme weeks</span>' +
-       '<span><i style="background:var(--blue)"></i>Weeks in so far</span><span><i style="background:#E0485A"></i>Over programme</span></div>';
+  h += '<div class="dash-card"><h3>Plot <em>||</em> Weeks to claim</h3>' +
+       '<div class="dash-sub">Bar = from coming into the stage to its claim date · dark = weeks gone, light = weeks left to claim</div>' +
+       '<div class="dash-legend"><span><i style="background:#D6E8F8"></i>Weeks left to claim</span>' +
+       '<span><i style="background:var(--blue)"></i>Weeks gone</span><span><i style="background:#E0485A"></i>Past the claim date</span></div>';
   if(rows.length){
     let ax = "";
     const step = scale > 10 ? 2 : 1;
@@ -4873,7 +4876,7 @@ function renderDashboard(){
       h += '<div class="dash-row" title="' + dashEsc(tip) + '">' +
         '<div class="dash-lbl">' + dashEsc(r.p.name) + ((houseType(r.p.name) || r.planned == null) ? '<small>' + dashEsc([houseType(r.p.name), r.planned == null ? "no programme" : ""].filter(Boolean).join(" · ")) + '</small>' : '') + '</div>' +
         weeksTrackHTML(r, scale) +
-        '<div class="dash-val' + (r.over ? ' bad' : r.early ? ' early' : '') + '">' + weeksLabel(r) + '</div></div>';
+        '<div class="dash-val' + (r.over ? ' bad' : r.soon ? ' soon' : r.early ? ' early' : '') + '">' + weeksLabel(r) + '</div></div>';
     });
   } else h += '<div class="dash-empty">No plots in the programme stages yet.</div>';
   h += '</div>';
